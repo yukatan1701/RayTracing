@@ -90,20 +90,20 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &sphe
     }
     vec3 reflectDir = normalize(reflect(dir, N));
     vec3 refractDir = normalize(refract(dir, N, material.refractive));
-    vec3 reflectOrig = dot(reflectDir, N) < 0 ? point - N * 0.001f : point + N * 0.001f;
-    vec3 refractOrig = dot(refractDir, N) < 0 ? point - N * 0.001f : point + N * 0.001f;
+    vec3 reflectOrig = dot(reflectDir, N) < 0.0f ? point - N * 0.001f : point + N * 0.001f;
+    vec3 refractOrig = dot(refractDir, N) < 0.0f ? point - N * 0.001f : point + N * 0.001f;
     vec3 reflectColor = traceRay(reflectOrig, reflectDir, spheres, triangles, lights, depth + 1);
     vec3 refractColor = traceRay(refractOrig, refractDir, spheres, triangles, lights, depth + 1); 
     float diffuseLightIntensity = 0;
     float specularLightIntensity = 0;
     for (auto &light: lights) {
         vec3 lightDir = normalize(light.position - point);
-        float lightDistance = distance2(light.position, point);
+        float lightDistance = distance(light.position, point);
         vec3 shadowOrig = dot(lightDir, N) < 0 ? point - N * 0.001f : point + N * 0.001f;
         vec3 shadowPt, shadowN;
         Material tmpmaterial;
         if (sceneIntersect(shadowOrig, lightDir, spheres, triangles, shadowPt, shadowN, tmpmaterial) &&
-            distance2(shadowPt, shadowOrig) < lightDistance)
+            distance(shadowPt, shadowOrig) < lightDistance)
             continue;
 
         diffuseLightIntensity += light.intensity * std::max(0.0f, dot(lightDir, N));
@@ -117,11 +117,11 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &sphe
 
 std::vector<Sphere> loadSpheres(const Materials &materials) {
     std::vector<Sphere> spheres;
-    spheres.push_back(Sphere(vec3(-3, 0, -16), 4, materials.get("ivory")));
-    spheres.push_back(Sphere(vec3(-1.0, -1.5, -12), 4, materials.get("glass")));
-    spheres.push_back(Sphere(vec3( 1.5, -0.5, -18), 8, materials.get("gold")));
-    spheres.push_back(Sphere(vec3( 7, 5, -18), 10, materials.get("mirror")));
-    spheres.push_back(Sphere(vec3(-5, 5, -20), 8, materials.get("silver")));
+    spheres.push_back(Sphere(vec3(-3, 0, -16), 2, materials["ivory"]));
+    spheres.push_back(Sphere(vec3(-1.0, -1.5, -12), 2, materials["glass"]));
+    spheres.push_back(Sphere(vec3( 1.5, -0.5, -18), 3, materials["gold"]));
+    spheres.push_back(Sphere(vec3( 7, 5, -18), 4, materials["mirror"]));
+    spheres.push_back(Sphere(vec3(-5, 5, -20), 4, materials["silver"]));
     return spheres;
 }
 
@@ -135,12 +135,15 @@ std::vector<Light> loadLights() {
 
 std::vector<Triangle> loadTriangles(const Materials &materials) {
     std::vector<Triangle> triangles;
-    Material gl(1.5, vec4(0.3,  1.5, 0.2, 0.5), vec3(.24, .21, .09),  125., "gl");
-    Material mt (1.5, vec4(0.5, 1.5, 0.8, 0.5), vec3(0.5, 0, 0),  125., "mt");
-    triangles.push_back(Triangle(vec3(8, -4, -17), vec3(8, -4, -19), vec3(7, -1, -18), gl));
-    triangles.push_back(Triangle(vec3(6, -4, -19), vec3(6, -4, -17), vec3(7, -1, -18), gl));
-    triangles.push_back(Triangle(vec3(6, -4, -17), vec3(8, -4, -17), vec3(7, -1, -18), gl));
-    //triangles.push_back(Triangle(vec3(8, -4, -17), vec3(8, -4, -24), vec3(4, -4, -17), mt));
+    Material glass = materials["pyramid_glass"];
+    triangles.push_back(Triangle(vec3(8, -4, -17), vec3(8, -4, -19), vec3(7, -1, -18), glass)); //right
+    triangles.push_back(Triangle(vec3(6, -4, -19), vec3(6, -4, -17), vec3(7, -1, -18), glass)); //left
+    triangles.push_back(Triangle(vec3(6, -4, -17), vec3(8, -4, -17), vec3(7, -1, -18), glass)); //front
+    triangles.push_back(Triangle(vec3(8, -4, -19), vec3(6, -4, -19), vec3(7, -1, -18), glass)); //back
+    Quadrangle mirror(vec3(-10, -4, -15), vec3(-10, -4, -25), vec3(-10, 4, -25),
+                      vec3(-10, 4, -15), materials["mirror"]);
+    std::vector<Triangle> mirTr = mirror.toTriangles();
+    triangles.insert(triangles.end(), mirTr.begin(), mirTr.end());
     return triangles;
 }
 

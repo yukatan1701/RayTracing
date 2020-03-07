@@ -3,8 +3,8 @@
 
 #include "glm/vec2.hpp"
 #include "glm/vec3.hpp"
-#include "glm/gtx/intersect.hpp"
 #include "Material.h"
+#include <vector>
 
 using namespace glm;
 
@@ -16,23 +16,33 @@ struct Sphere {
     Sphere(const vec3 &center, const float &radius): center(center), radius(radius) {}
     Sphere(const vec3 &c, const float &r, const Material &m): center(c), radius(r), material(m) {}
 
-    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
-        return intersectRaySphere(orig, dir, center, radius, dist);
-    }
+    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
 };
 
 struct Triangle {
     vec3 v0, v1, v2;
     Material material;
+
     Triangle(const vec3 &vert0, const vec3 &vert1, const vec3 &vert2) :
         v0(vert0), v1(vert1), v2(vert2) {} 
     Triangle(const vec3 &vert0, const vec3 &vert1, const vec3 &vert2, const Material &m) :
         v0(vert0), v1(vert1), v2(vert2), material(m) {}
 
-    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
-        vec2 baryPosition;
-        return intersectRayTriangle(orig, dir, v0, v1, v2, baryPosition, dist);
-    }
+    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
+
+};
+
+struct Quadrangle {
+    vec3 v0, v1, v2, v3;
+    Material material;
+
+    Quadrangle(const vec3 &vert0, const vec3 &vert1, const vec3 &vert2, const vec3 &vert3) :
+        v0(vert0), v1(vert1), v2(vert2), v3(vert3) {}
+    Quadrangle(const vec3 &vert0, const vec3 &vert1, const vec3 &vert2, const vec3 &vert3, const Material &m) :
+        v0(vert0), v1(vert1), v2(vert2), v3(vert3), material(m) {}
+
+    std::vector<Triangle> toTriangles() const;
+    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
 };
 
 struct Light {

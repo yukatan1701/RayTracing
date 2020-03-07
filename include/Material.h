@@ -7,10 +7,10 @@
 #include <string>
 
 struct Material {
-    float refractive;
-    glm::vec4 albedo; //( яркость, матовость, отражающая способность, прозрачность)
+    glm::vec4 albedo; // brightness, smoothness, reflectivity, refractivity
     glm::vec3 diffuse;
     float specular;
+    float refractive;
     std::string name;
     Material() : refractive(1), albedo(1, 0, 0, 0), diffuse(), specular(), name("none") {}
     Material(const float &r, const glm::vec4 &a, const glm::vec3 &color, const float &spec,
@@ -24,6 +24,7 @@ private:
 public:
     Materials();
     Material get(const std::string &name) const;
+    Material operator [](const std::string &name) const { return get(name); }
 };
 
 #endif
