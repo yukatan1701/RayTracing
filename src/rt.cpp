@@ -32,18 +32,13 @@ vec3 reflect(const vec3 &i, const vec3 &n) {
     return i - n * 2.0f * dot(i, n);
 }
 
-vec3 refract(const vec3 &I, const vec3 &N, const float refractiveIndex) {
+vec3 refract(const vec3 &I, const vec3 &N, const float etat, const float etai = 1.0f) {
     float cosi = -std::max(-1.0f, std::min(1.0f, dot(I, N)));
-    float etai = 1.0f, etat = refractiveIndex;
-    vec3 n = N;
-    if (cosi < 0) {
-        cosi = -cosi;
-        std::swap(etai, etat);
-        n = -N;
-    }
+    if (cosi < 0)
+        return refract(I, -N, etai, etat);
     float eta = etai / etat;
     float k = 1 - eta * eta * (1 - cosi * cosi);
-    return k < 0 ? vec3(0, 0, 0) : I * eta + n * (eta * cosi - sqrtf(k));
+    return k < 0 ? vec3(1, 0, 0) : I * eta + N * (eta * cosi - sqrtf(k));
 }
 
 bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &spheres,
@@ -70,7 +65,7 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere>
         }
     }
     float checkerboardDist = std::numeric_limits<float>::max();
-    if (fabs(dir.y) > 1e-3) {
+    if (fabs(dir.y) > 0.001) {
         float d = -(orig.y + 4) / dir.y;
         vec3 pt = orig + dir * d;
         if (d > 0 && fabs(pt.x) < 10 && pt.z < -10 && pt.z > -30 && d < spheresDist && d < trianglesDist) {
@@ -78,8 +73,7 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere>
             hit = pt;
             N = vec3(0, 1, 0);
             material.diffuse = (int(0.5f * hit.x + 1000) + int(0.5 * hit.z)) & 1 ? 
-                vec3(1, 1, 1) : vec3(1, 0.7f, 0.3f);
-            material.diffuse *= 0.3f;
+                vec3(.3, .3, .3) : vec3(.3, .2, .1);
         }
     }
     return std::min(trianglesDist, std::min(spheresDist, checkerboardDist)) < 1000;
@@ -96,8 +90,8 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &sphe
     }
     vec3 reflectDir = normalize(reflect(dir, N));
     vec3 refractDir = normalize(refract(dir, N, material.refractive));
-    vec3 reflectOrig = dot(reflectDir, N) < 0 ? point - N * (float) 1e-3 : point + N * (float) 1e-3;
-    vec3 refractOrig = dot(refractDir, N) < 0 ? point - N * (float) 1e-3 : point + N * (float) 1e-3;
+    vec3 reflectOrig = dot(reflectDir, N) < 0 ? point - N * 0.001f : point + N * 0.001f;
+    vec3 refractOrig = dot(refractDir, N) < 0 ? point - N * 0.001f : point + N * 0.001f;
     vec3 reflectColor = traceRay(reflectOrig, reflectDir, spheres, triangles, lights, depth + 1);
     vec3 refractColor = traceRay(refractOrig, refractDir, spheres, triangles, lights, depth + 1); 
     float diffuseLightIntensity = 0;
@@ -105,7 +99,7 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &sphe
     for (auto &light: lights) {
         vec3 lightDir = normalize(light.position - point);
         float lightDistance = distance2(light.position, point);
-        vec3 shadowOrig = dot(lightDir, N) < 0 ? point - N * (float) 1e-3 : point + N * (float) 1e-3;
+        vec3 shadowOrig = dot(lightDir, N) < 0 ? point - N * 0.001f : point + N * 0.001f;
         vec3 shadowPt, shadowN;
         Material tmpmaterial;
         if (sceneIntersect(shadowOrig, lightDir, spheres, triangles, shadowPt, shadowN, tmpmaterial) &&
@@ -113,7 +107,7 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &sphe
             continue;
 
         diffuseLightIntensity += light.intensity * std::max(0.0f, dot(lightDir, N));
-        specularLightIntensity += powf(std::max(0.0f, dot(reflect(lightDir, N),dir)),
+        specularLightIntensity += powf(std::max(0.0f, dot(-reflect(-lightDir, N), dir)),
             material.specular) * light.intensity;
     }
     return material.diffuse * diffuseLightIntensity * material.albedo[0] +
@@ -156,7 +150,7 @@ void render(Settings &settings) {
     std::vector<Triangle> triangles = loadTriangles(materials);
     std::vector<Light> lights = loadLights();
 
-    const int fov = M_PI / 3.0f;
+    const float fov = M_PI / 3.0f;
     std::vector<vec3> frameBuffer(width * height);
 //#pragma omp parallel for
     for (size_t i = 0; i < height; ++i) {
@@ -165,7 +159,7 @@ void render(Settings &settings) {
             float y = -(i + 0.5f) + height / 2.0f;
             float z = -height / (2.0f * tan(fov / 2.0f));
             vec3 dir = normalize(vec3(x, y, z));
-            frameBuffer[i * width + j] = traceRay(vec3(0.0f, 0.0f, 0.0f), dir, spheres, triangles, lights);
+            frameBuffer[i * width + j] = traceRay(vec3(0, 0, 0), dir, spheres, triangles, lights);
         }
     }
 
