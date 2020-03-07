@@ -11,9 +11,11 @@ struct Material {
     glm::vec3 diffuseColor;
     float refractiveIndex;
     float specularExponent;
-    Material() : refractiveIndex(1), albedo(1, 0, 0, 0), diffuseColor(), specularExponent() {}
-    Material(const float &r, const glm::vec4 &a, const glm::vec3 &color, const float &spec) : refractiveIndex(r), albedo(a), diffuseColor(color),
-             specularExponent(spec) {}
+    std::string name;
+    Material() : refractiveIndex(1), albedo(1, 0, 0, 0), diffuseColor(), specularExponent(), name("none") {}
+    Material(const float &r, const glm::vec4 &a, const glm::vec3 &color, const float &spec,
+             const std::string &name) : refractiveIndex(r), albedo(a), diffuseColor(color),
+             specularExponent(spec), name(name) {}
 };
 
 class Materials {
