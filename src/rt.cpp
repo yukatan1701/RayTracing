@@ -65,9 +65,9 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere>
             checkerboardDist = d;
             hit = pt;
             N = vec3(0, 1, 0);
-            material.diffuseColor = (int(0.5f * hit.x + 1000) + int(0.5 * hit.z)) & 1 ? 
+            material.diffuse = (int(0.5f * hit.x + 1000) + int(0.5 * hit.z)) & 1 ? 
                 vec3(1, 1, 1) : vec3(1, 0.7f, 0.3f);
-            material.diffuseColor *= 0.3f;
+            material.diffuse *= 0.3f;
         }
     }
     return std::min(spheresDist, checkerboardDist) < 1000;
@@ -82,7 +82,7 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &sphe
         return vec3(0.2, 0.7, 0.8);
     }
     vec3 reflectDir = normalize(reflect(dir, N));
-    vec3 refractDir = normalize(refract(dir, N, material.refractiveIndex));
+    vec3 refractDir = normalize(refract(dir, N, material.refractive));
     vec3 reflectOrig = dot(reflectDir, N) < 0 ? point - N * (float) 1e-3 : point + N * (float) 1e-3;
     vec3 refractOrig = dot(refractDir, N) < 0 ? point - N * (float) 1e-3 : point + N * (float) 1e-3;
     vec3 reflectColor = traceRay(reflectOrig, reflectDir, spheres, lights, depth + 1);
@@ -101,25 +101,35 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &sphe
 
         diffuseLightIntensity += light.intensity * std::max(0.0f, dot(lightDir, N));
         specularLightIntensity += powf(std::max(0.0f, dot(reflect(lightDir, N),dir)),
-            material.specularExponent) * light.intensity;
+            material.specular) * light.intensity;
     }
-    return material.diffuseColor * diffuseLightIntensity * material.albedo[0] +
+    return material.diffuse * diffuseLightIntensity * material.albedo[0] +
            vec3(1.0f, 1.0f, 1.0f) * specularLightIntensity * material.albedo[1] +
            reflectColor * material.albedo[2] + refractColor * material.albedo[3];
 }
 
-void render(Settings &settings) {
-    Materials materials;
+std::vector<Sphere> loadSpheres(const Materials &materials) {
     std::vector<Sphere> spheres;
     spheres.push_back(Sphere(vec3(-3, 0, -16), 4, materials.get("ivory")));
     spheres.push_back(Sphere(vec3(-1.0, -1.5, -12), 4, materials.get("glass")));
-    spheres.push_back(Sphere(vec3( 1.5, -0.5, -18), 8, materials.get("red_rubber")));
+    spheres.push_back(Sphere(vec3( 1.5, -0.5, -18), 8, materials.get("gold")));
     spheres.push_back(Sphere(vec3( 7, 5, -18), 10, materials.get("mirror")));
+    spheres.push_back(Sphere(vec3(-5, 5, -20), 8, materials.get("silver")));
+    return spheres;
+}
 
+std::vector<Light> loadLights() {
     std::vector<Light> lights;
     lights.push_back(Light(vec3(-20, 20,  20), 1.5));
     lights.push_back(Light(vec3( 30, 50, -25), 1.8));
     lights.push_back(Light(vec3( 30, 20,  30), 1.7));
+    return lights;
+}
+
+void render(Settings &settings) {
+    const Materials materials;
+    std::vector<Sphere> spheres = loadSpheres(materials);
+    std::vector<Light> lights = loadLights();
 
     const int fov = M_PI / 3.0f;
     std::vector<vec3> frameBuffer(width * height);
