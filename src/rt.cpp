@@ -6,6 +6,7 @@
 #include "bitmap_image.hpp"
 #include "glm/vec2.hpp"
 #include "glm/vec3.hpp"
+#include "glm/vec4.hpp"
 #include "glm/gtx/intersect.hpp"
 #include "glm/gtx/norm.hpp"
 #include "ParseException.h"
@@ -25,12 +26,13 @@ struct Settings {
 };
 
 struct Material {
-    vec2 albedo;
+    vec4 albedo;
     vec3 diffuseColor;
+    float refractiveIndex;
     float specularExponent;
-    Material() : albedo(1, 0), diffuseColor(), specularExponent() {}
-    Material(const vec2 &a, const vec3 &color, const float &spec) :
-        albedo(a), diffuseColor(color), specularExponent(spec) {}
+    Material() : refractiveIndex(1), albedo(1, 0, 0, 0), diffuseColor(), specularExponent() {}
+    Material(const float &r, const vec4 &a, const vec3 &color, const float &spec) :
+        refractiveIndex(r), albedo(a), diffuseColor(color), specularExponent(spec) {}
 };
 
 struct Sphere {
@@ -56,6 +58,20 @@ vec3 reflect(const vec3 &i, const vec3 &n) {
     return i - n * 2.0f * dot(i, n);
 }
 
+vec3 refract(const vec3 &I, const vec3 &N, const float refractiveIndex) {
+    float cosi = -std::max(-1.0f, std::min(1.0f, dot(I, N)));
+    float etai = 1.0f, etat = refractiveIndex;
+    vec3 n = N;
+    if (cosi < 0) {
+        cosi = -cosi;
+        std::swap(etai, etat);
+        n = -N;
+    }
+    float eta = etai / etat;
+    float k = 1 - eta * eta * (1 - cosi * cosi);
+    return k < 0 ? vec3(0, 0, 0) : I * eta + n * (eta * cosi - sqrtf(k));
+}
+
 bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &spheres,
                     vec3 &hit, vec3 &N, Material &material) {
     float spheresDist = std::numeric_limits<float>::max();
@@ -68,17 +84,36 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere>
             material = sphere.material;
         }
     }
-    return spheresDist < 1000;
+    float checkerboardDist = std::numeric_limits<float>::max();
+    if (fabs(dir.y) > 1e-3) {
+        float d = -(orig.y + 4) / dir.y;
+        vec3 pt = orig + dir * d;
+        if (d > 0 && fabs(pt.x) < 10 && pt.z < -10 && pt.z > -30 && d < spheresDist) {
+            checkerboardDist = d;
+            hit = pt;
+            N = vec3(0, 1, 0);
+            material.diffuseColor = (int(0.5f * hit.x + 1000) + int(0.5 * hit.z)) & 1 ? 
+                vec3(1, 1, 1) : vec3(1, 0.7f, 0.3f);
+            material.diffuseColor *= 0.3f;
+        }
+    }
+    return std::min(spheresDist, checkerboardDist) < 1000;
 }
 
-vec3 castRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &spheres,
-             const std::vector<Light> &lights) {
+vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &spheres,
+              const std::vector<Light> &lights, size_t depth = 0) {
     vec3 point, N;
     Material material;
 
-    if (!sceneIntersect(orig, dir, spheres, point, N, material)) {
+    if (depth > 4 || !sceneIntersect(orig, dir, spheres, point, N, material)) {
         return vec3(0.2, 0.7, 0.8);
     }
+    vec3 reflectDir = normalize(reflect(dir, N));
+    vec3 refractDir = normalize(refract(dir, N, material.refractiveIndex));
+    vec3 reflectOrig = dot(reflectDir, N) < 0 ? point - N * (float) 1e-3 : point + N * (float) 1e-3;
+    vec3 refractOrig = dot(refractDir, N) < 0 ? point - N * (float) 1e-3 : point + N * (float) 1e-3;
+    vec3 reflectColor = traceRay(reflectOrig, reflectDir, spheres, lights, depth + 1);
+    vec3 refractColor = traceRay(refractOrig, refractDir, spheres, lights, depth + 1); 
     float diffuseLightIntensity = 0;
     float specularLightIntensity = 0;
     for (auto &light: lights) {
@@ -96,32 +131,36 @@ vec3 castRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &spher
             material.specularExponent) * light.intensity;
     }
     return material.diffuseColor * diffuseLightIntensity * material.albedo[0] +
-           vec3(1.0f, 1.0f, 1.0f) * specularLightIntensity * material.albedo[1];
+           vec3(1.0f, 1.0f, 1.0f) * specularLightIntensity * material.albedo[1] +
+           reflectColor * material.albedo[2] + refractColor * material.albedo[3];
 }
 
 void render(Settings &settings) {
-    Material ivory(vec2(0.6, 0.3), vec3(0.4, 0.4, 0.3), 50.0);
-    Material red_rubber(vec2(0.9, 0.1), vec3(0.3, 0.1, 0.1), 10.0);
+    Material      ivory(1.0, vec4(0.6,  0.3, 0.1, 0.0), vec3(0.4, 0.4, 0.3),   50.);
+    Material      glass(1.5, vec4(0.0,  0.5, 0.1, 0.8), vec3(0.6, 0.7, 0.8),  125.);
+    Material red_rubber(1.0, vec4(0.9,  0.1, 0.0, 0.0), vec3(0.3, 0.1, 0.1),   10.);
+    Material     mirror(1.0, vec4(0.0, 10.0, 0.8, 0.0), vec3(1.0, 1.0, 1.0), 1425.);
     std::vector<Sphere> spheres;
-    spheres.push_back(Sphere(vec3(-3,    0,   -16), 4,      ivory));
-    spheres.push_back(Sphere(vec3(-1.0, -1.5, -12), 4, red_rubber));
+    spheres.push_back(Sphere(vec3(-3, 0, -16), 4, ivory));
+    spheres.push_back(Sphere(vec3(-1.0, -1.5, -12), 4, glass));
     spheres.push_back(Sphere(vec3( 1.5, -0.5, -18), 8, red_rubber));
-    spheres.push_back(Sphere(vec3( 7,    5,   -18), 10,      ivory));
+    spheres.push_back(Sphere(vec3( 7, 5, -18), 10, mirror));
 
     std::vector<Light> lights;
     lights.push_back(Light(vec3(-20, 20,  20), 1.5));
     lights.push_back(Light(vec3( 30, 50, -25), 1.8));
     lights.push_back(Light(vec3( 30, 20,  30), 1.7));
 
-    const int fov = M_PI / 2.0f;
+    const int fov = M_PI / 3.0f;
     std::vector<vec3> frameBuffer(width * height);
 //#pragma omp parallel for
     for (size_t i = 0; i < height; ++i) {
         for (size_t j = 0; j < width; ++j) {
-            float y = -(2.0f * (i + 0.5f) / (float) width  - 1) * tan(fov / 2.0f) * width / (float) height;
-            float x = (2.0f * (j + 0.5f) / (float) height - 1) * tan(fov / 2.0f);
-            vec3 dir = normalize(vec3(x, y, -1.0f));
-            frameBuffer[i * width + j] = castRay(vec3(0.0f, 0.0f, 0.0f), dir, spheres, lights);
+            float x =  (j + 0.5f) -  width / 2.0f;
+            float y = -(i + 0.5f) + height / 2.0f;
+            float z = -height / (2.0f * tan(fov / 2.0f));
+            vec3 dir = normalize(vec3(x, y, z));
+            frameBuffer[i * width + j] = traceRay(vec3(0.0f, 0.0f, 0.0f), dir, spheres, lights);
         }
     }
 
