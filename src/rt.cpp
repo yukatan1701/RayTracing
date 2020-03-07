@@ -13,9 +13,14 @@
 #include "Material.h"
 #include "SceneObjects.h"
 #include "ParseException.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 const int width = 1024;
 const int height = 768;
+
+int envmap_width, envmap_height;
+std::vector<vec3> envmap;
 
 using namespace glm;
 
@@ -86,7 +91,13 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &sphe
     Material material;
 
     if (depth > 4 || !sceneIntersect(orig, dir, spheres, triangles, point, N, material)) {
-        return vec3(0.2, 0.7, 0.8);
+        Sphere env(vec3(0,0,0), 100, Material());
+        float dist = 0;
+        env.rayIntersect(orig, dir, dist);
+        vec3 p = orig + dir*dist;
+        int a = (atan2(p.z, p.x) / (2 * M_PI) + 0.5f) * envmap_width;
+        int b = acos(p.y / 100.0f) / M_PI * envmap_height;
+        return envmap[a+b*envmap_width];
     }
     vec3 reflectDir = normalize(reflect(dir, N));
     vec3 refractDir = normalize(refract(dir, N, material.refractive));
@@ -222,6 +233,22 @@ int main(int argc, char **argv) {
         e.printMessage();
         return -1;
     }
+
+    int n = -1;
+    unsigned char *pixmap = stbi_load("../resources/map3.jpg", &envmap_width, &envmap_height, &n, 0);
+    if (!pixmap || 3!=n) {
+        std::cout << "Error: can not load the environment map" << std::endl;
+        return -1;
+    }
+    envmap = std::vector<vec3>(envmap_width*envmap_height);
+    for (int j = envmap_height-1; j>=0 ; j--) {
+        for (int i = 0; i<envmap_width; i++) {
+            envmap[i+j*envmap_width] = vec3(pixmap[(i+j*envmap_width)*3+0],
+                                            pixmap[(i+j*envmap_width)*3+1],
+                                            pixmap[(i+j*envmap_width)*3+2]) * (1/255.0f);
+        }
+    }
+    stbi_image_free(pixmap);
     std::cout << "[Current settings]" << std::endl;
     std::cout << "Output path: " << settings.out << std::endl;
     std::cout << "Scene number: " << settings.scene << std::endl;
