@@ -7,9 +7,10 @@
 #include "glm/vec2.hpp"
 #include "glm/vec3.hpp"
 #include "glm/vec4.hpp"
-#include "glm/gtx/intersect.hpp"
 #include "glm/gtx/norm.hpp"
+#include "Material.h"
 #include "ParseException.h"
+#include "SceneObjects.h"
 
 const int width = 1024;
 const int height = 768;
@@ -23,35 +24,6 @@ struct Settings {
     Settings() : out("rt.bmp"), scene(1), threads(1) {}
     Settings(std::string out, unsigned int scene, unsigned int threads) :
         out(out), scene(scene), threads(threads) {}
-};
-
-struct Material {
-    vec4 albedo;
-    vec3 diffuseColor;
-    float refractiveIndex;
-    float specularExponent;
-    Material() : refractiveIndex(1), albedo(1, 0, 0, 0), diffuseColor(), specularExponent() {}
-    Material(const float &r, const vec4 &a, const vec3 &color, const float &spec) :
-        refractiveIndex(r), albedo(a), diffuseColor(color), specularExponent(spec) {}
-};
-
-struct Sphere {
-    vec3 center;
-    float radius;
-    Material material;
-
-    Sphere(const vec3 &center, const float &radius): center(center), radius(radius) {}
-    Sphere(const vec3 &c, const float &r, const Material &m): center(c), radius(r), material(m) {}
-
-    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
-        return intersectRaySphere(orig, dir, center, radius, dist);
-    }
-};
-
-struct Light {
-    vec3 position;
-    float intensity;
-    Light(const vec3 &pos, const float &i) : position(pos), intensity(i) {}
 };
 
 vec3 reflect(const vec3 &i, const vec3 &n) {
@@ -136,6 +108,12 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &sphe
 }
 
 void render(Settings &settings) {
+    /*Materials materials;
+    std::vector<Sphere> spheres;
+    spheres.push_back(Sphere(vec3(-3, 0, -16), 4, materials.get("ivory")));
+    spheres.push_back(Sphere(vec3(-1.0, -1.5, -12), 4, materials.get("glass")));
+    spheres.push_back(Sphere(vec3( 1.5, -0.5, -18), 8, materials.get("red_rubber")));
+    spheres.push_back(Sphere(vec3( 7, 5, -18), 10, materials.get("mirror")));*/
     Material      ivory(1.0, vec4(0.6,  0.3, 0.1, 0.0), vec3(0.4, 0.4, 0.3),   50.);
     Material      glass(1.5, vec4(0.0,  0.5, 0.1, 0.8), vec3(0.6, 0.7, 0.8),  125.);
     Material red_rubber(1.0, vec4(0.9,  0.1, 0.0, 0.0), vec3(0.3, 0.1, 0.1),   10.);
