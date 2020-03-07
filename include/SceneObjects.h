@@ -21,6 +21,20 @@ struct Sphere {
     }
 };
 
+struct Triangle {
+    vec3 v0, v1, v2;
+    Material material;
+    Triangle(const vec3 &vert0, const vec3 &vert1, const vec3 &vert2) :
+        v0(vert0), v1(vert1), v2(vert2) {} 
+    Triangle(const vec3 &vert0, const vec3 &vert1, const vec3 &vert2, const Material &m) :
+        v0(vert0), v1(vert1), v2(vert2), material(m) {}
+
+    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
+        vec2 baryPosition;
+        return intersectRayTriangle(orig, dir, v0, v1, v2, baryPosition, dist);
+    }
+};
+
 struct Light {
     vec3 position;
     float intensity;

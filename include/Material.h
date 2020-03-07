@@ -23,7 +23,7 @@ private:
     std::vector<Material> materials;
 public:
     Materials();
-    const Material& get(const std::string &name) const;
+    Material get(const std::string &name) const;
 };
 
 #endif

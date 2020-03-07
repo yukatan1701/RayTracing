@@ -13,12 +13,12 @@ Materials::Materials() {
     materials.push_back(Material(1.0, vec4(0.5, 3.0, 0.2, 0.0), vec3(120/255.0f, 85/255.0f, 15/255.0f), 125, "gold"));
     materials.push_back(Material(1.0, vec4(0.5, 3.0, 0.2, 0.0), vec3(0.3, 0.3, 0.3), 125, "silver"));
 }
-const Material& Materials::get(const std::string &name) const {
+Material Materials::get(const std::string &name) const {
     for (auto &item : materials) {
         if (item.name == name)
             return item;
     }
     std::cerr << "Failed to find material of type '" << name <<
                     "'. Load standard material." << std::endl; 
-    return materials[0];
+    return Material();
 }
