@@ -4,6 +4,7 @@
 #include "glm/vec2.hpp"
 #include "glm/vec3.hpp"
 #include "Material.h"
+#include <deque>
 #include <vector>
 
 using namespace glm;
@@ -41,7 +42,7 @@ struct Quadrangle {
     Quadrangle(const vec3 &vert0, const vec3 &vert1, const vec3 &vert2, const vec3 &vert3, const Material &m) :
         v0(vert0), v1(vert1), v2(vert2), v3(vert3), material(m) {}
 
-    std::vector<Triangle> toTriangles() const;
+    std::deque<Triangle> toTriangles() const;
     bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
 };
 
@@ -49,6 +50,14 @@ struct Light {
     vec3 position;
     float intensity;
     Light(const vec3 &pos, const float &i) : position(pos), intensity(i) {}
+};
+
+struct Model {
+    std::deque<Triangle> triangles;
+    float scale;
+    Material material;
+    Model(const std::string &filename, const float &scale,
+          const Material &m);
 };
 
 #endif

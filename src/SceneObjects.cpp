@@ -1,5 +1,7 @@
 #include "SceneObjects.h"
 #include "glm/detail/func_geometric.inl"
+#include <iostream>
+#include <fstream>
 #include <vector>
 
 using namespace glm;
@@ -40,10 +42,11 @@ bool Triangle::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) cons
     return dist > eps;
 }
 
-std::vector<Triangle> Quadrangle::toTriangles() const {
-    std::vector<Triangle> tr;
-    tr.push_back(Triangle(v0, v1, v2, material));
-    tr.push_back(Triangle(v0, v2, v3, material));
+
+std::deque<Triangle> Quadrangle::toTriangles() const {
+    std::deque<Triangle> tr;
+    tr.push_front(Triangle(v0, v1, v2, material));
+    tr.push_front(Triangle(v0, v2, v3, material));
     return tr;
 }
 
@@ -60,3 +63,47 @@ bool Quadrangle::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) co
         }
         return false;
     }
+
+Model::Model(const std::string &filename, const float &scale,
+             const Material &m = Material()) : scale(scale), material(m) {
+    std::ifstream file(filename, std::ios::in);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open '" << filename << "' file." << std::endl;
+    }
+    int vertNum = 0, faceNum = 0;
+    file >> vertNum >> faceNum;
+    std::vector<vec3> vertices;
+    int n = 10;
+    float min_x, min_y, min_z, max_x, max_y, max_z;
+    min_x = min_y = min_z = 1000;
+    max_x = max_y = max_z = -1000;
+    vec3 bias(4.0f, -7.0f, -30.0f);
+    while (vertNum--) {
+        double x = 0.0, y = 0.0, z = 0.0;
+        char ch = 0;
+        file >> ch; // v
+        file >> x >> y >> z;
+        vec3 v = vec3((float) x, (float) y, (float) z) * scale + bias;
+        min_x = std::min(min_x, v.x);
+        min_y = std::min(min_y, v.y);
+        min_z = std::min(min_z, v.z);
+        max_x = std::max(max_x, v.x);
+        max_y = std::max(max_y, v.y);
+        max_z = std::max(max_z, v.z);
+        vertices.push_back(v);
+        //if (n-- > 0) {
+            //std::cout << v.x << " " << v.y << " " << v.z << std::endl;
+        //}
+    }
+    std::cout << min_x << " " << min_y << " " << min_z << std::endl;
+    std::cout << max_x << " " << max_y << " " << max_z << std::endl;
+    while (faceNum--) {
+        int ix, iy, iz;
+        char ch = 0;
+        file >> ch; // f
+        file >> ix >> iy >> iz;
+        Triangle tr(vertices[ix-1], vertices[iy-1], vertices[iz-1], material);
+        triangles.push_front(tr);
+    } 
+    file.close();
+}

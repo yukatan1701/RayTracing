@@ -3,6 +3,7 @@
 #include <vector>
 #include <limits>
 #include <cmath>
+#include <omp.h>
 #include "bitmap_image.hpp"
 #include "glm/vec2.hpp"
 #include "glm/vec3.hpp"
@@ -18,6 +19,8 @@
 
 const int width = 1024;
 const int height = 768;
+
+int procsNum = 1;
 
 int envmap_width, envmap_height;
 std::vector<vec3> envmap;
@@ -47,7 +50,7 @@ vec3 refract(const vec3 &I, const vec3 &N, const float etat, const float etai = 
 }
 
 bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &spheres,
-                    const std::vector<Triangle> &triangles,
+                    const std::deque<Triangle> &triangles,
                     vec3 &hit, vec3 &N, Material &material) {
     float spheresDist = std::numeric_limits<float>::max();
     for (auto &sphere: spheres) {
@@ -85,7 +88,7 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere>
 }
 
 vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &spheres,
-              const std::vector<Triangle> &triangles,
+              const std::deque<Triangle> &triangles,
               const std::vector<Light> &lights, size_t depth = 0) {
     vec3 point, N;
     Material material;
@@ -128,11 +131,11 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &sphe
 
 std::vector<Sphere> loadSpheres(const Materials &materials) {
     std::vector<Sphere> spheres;
-    spheres.push_back(Sphere(vec3(-3, 0, -16), 2, materials["ivory"]));
+    /*spheres.push_back(Sphere(vec3(-3, 0, -16), 2, materials["ivory"]));
     spheres.push_back(Sphere(vec3(-1.0, -1.5, -12), 2, materials["glass"]));
-    spheres.push_back(Sphere(vec3( 1.5, -0.5, -18), 3, materials["gold"]));
+    spheres.push_back(Sphere(vec3( 1.5, -0.5, -18), 3, materials["gold"]));/**/
     spheres.push_back(Sphere(vec3( 7, 5, -18), 4, materials["mirror"]));
-    spheres.push_back(Sphere(vec3(-5, 5, -20), 4, materials["silver"]));
+    //spheres.push_back(Sphere(vec3(-5, 5, -20), 4, materials["silver"]));
     return spheres;
 }
 
@@ -144,36 +147,45 @@ std::vector<Light> loadLights() {
     return lights;
 }
 
-std::vector<Triangle> loadTriangles(const Materials &materials) {
-    std::vector<Triangle> triangles;
+std::deque<Triangle> loadTriangles(const Materials &materials) {
+    std::deque<Triangle> triangles;
     Material glass = materials["pyramid_glass"];
-    triangles.push_back(Triangle(vec3(8, -4, -17), vec3(8, -4, -19), vec3(7, -1, -18), glass)); //right
-    triangles.push_back(Triangle(vec3(6, -4, -19), vec3(6, -4, -17), vec3(7, -1, -18), glass)); //left
-    triangles.push_back(Triangle(vec3(6, -4, -17), vec3(8, -4, -17), vec3(7, -1, -18), glass)); //front
-    triangles.push_back(Triangle(vec3(8, -4, -19), vec3(6, -4, -19), vec3(7, -1, -18), glass)); //back
+    /*triangles.push_front(Triangle(vec3(8, -4, -17), vec3(8, -4, -19), vec3(7, -1, -18), glass)); //right
+    triangles.push_front(Triangle(vec3(6, -4, -19), vec3(6, -4, -17), vec3(7, -1, -18), glass)); //left
+    triangles.push_front(Triangle(vec3(6, -4, -17), vec3(8, -4, -17), vec3(7, -1, -18), glass)); //front
+    triangles.push_front(Triangle(vec3(8, -4, -19), vec3(6, -4, -19), vec3(7, -1, -18), glass)); //back
     Quadrangle mirror(vec3(-10, -4, -15), vec3(-10, -4, -25), vec3(-10, 4, -25),
                       vec3(-10, 4, -15), materials["mirror"]);
-    std::vector<Triangle> mirTr = mirror.toTriangles();
-    triangles.insert(triangles.end(), mirTr.begin(), mirTr.end());
+    std::deque<Triangle> mirTr = mirror.toTriangles();
+    triangles.insert(triangles.begin(), mirTr.begin(), mirTr.end());*/
     return triangles;
 }
 
 void render(Settings &settings) {
     const Materials materials;
     std::vector<Sphere> spheres = loadSpheres(materials);
-    std::vector<Triangle> triangles = loadTriangles(materials);
+    std::deque<Triangle> triangles = loadTriangles(materials);
     std::vector<Light> lights = loadLights();
+    Model bunny("../resources/bunny.obj", 100.0f, materials["ivory"]);
+    //triangles.insert(triangles.begin(), bunny.triangles.begin(), bunny.triangles.end());
 
     const float fov = M_PI / 3.0f;
+    const int samples = 8;
     std::vector<vec3> frameBuffer(width * height);
-//#pragma omp parallel for
+
+    vec3 camera(0, 5, 0);
+#pragma omp parallel for schedule(static)
     for (size_t i = 0; i < height; ++i) {
         for (size_t j = 0; j < width; ++j) {
-            float x =  (j + 0.5f) -  width / 2.0f;
-            float y = -(i + 0.5f) + height / 2.0f;
-            float z = -height / (2.0f * tan(fov / 2.0f));
-            vec3 dir = normalize(vec3(x, y, z));
-            frameBuffer[i * width + j] = traceRay(vec3(0, 0, 0), dir, spheres, triangles, lights);
+            //frameBuffer[i * width + j] = vec3(0, 0, 0);
+            //for (int s = 0; s < samples; ++s) {
+                float x =  (j + 0.5f) -  width / 2.0f;
+                float y = -(i + 0.5f) + height / 2.0f;
+                float z = -height / (2.0f * tan(fov / 2.0f));
+                vec3 dir = normalize(vec3(x, y, z));
+                frameBuffer[i * width + j] = traceRay(camera, dir, spheres, bunny.triangles, lights);
+            //}
+            //frameBuffer[i * width + j] /= (float) samples;
         }
     }
 
@@ -233,7 +245,8 @@ int main(int argc, char **argv) {
         e.printMessage();
         return -1;
     }
-
+    procsNum = omp_get_num_procs();
+    omp_set_num_threads(procsNum);
     int n = -1;
     unsigned char *pixmap = stbi_load("../resources/map3.jpg", &envmap_width, &envmap_height, &n, 0);
     if (!pixmap || 3!=n) {
@@ -254,7 +267,9 @@ int main(int argc, char **argv) {
     std::cout << "Scene number: " << settings.scene << std::endl;
     std::cout << "Threads: " << settings.threads << std::endl;
     std::cout << "\nRendering image..." << std::endl;
+    double time0 = omp_get_wtime();
     render(settings);
-    std::cout << "Done." << std::endl;
+    double time1 = omp_get_wtime();
+    std::cout << "Done. Elapsed time: " << time1 - time0 << std::endl;
     return 0;
 }
