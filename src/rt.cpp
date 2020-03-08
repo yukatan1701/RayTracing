@@ -50,7 +50,7 @@ vec3 refract(const vec3 &I, const vec3 &N, const float etat, const float etai = 
 }
 
 bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &spheres,
-                    const std::deque<Triangle> &triangles,
+                    const std::deque<Triangle> &triangles, const std::vector<Model> &models,
                     vec3 &hit, vec3 &N, Material &material) {
     float spheresDist = std::numeric_limits<float>::max();
     for (auto &sphere: spheres) {
@@ -72,11 +72,38 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere>
             material = triangle.material;
         }
     }
+    float modelsDist = std::numeric_limits<float>::max();
+    int n = 1;
+    for (auto &model : models) {
+        float curDist;
+        if (model.cubeIntersect(orig, dir, curDist) && curDist < modelsDist &&
+                    curDist < trianglesDist && curDist < spheresDist) {
+            if (n == 1) {
+                //std::cout << "Success!" << std::endl;
+            }
+            modelsDist = curDist;
+            hit = orig + dir * curDist;
+            N = vec3(0, -1, 0);
+            material = Material();
+            /*
+            for (auto &triangle : model.triangles) {
+                float curDist;
+                if (triangle.rayIntersect(orig, dir, curDist) && curDist < modelsDist &&
+                    curDist < trianglesDist && curDist < spheresDist) {
+                    modelsDist = curDist;
+                    hit = orig + dir * curDist;
+                    N = triangleNormal(triangle.v0, triangle.v1, triangle.v2);
+                    material = triangle.material;
+                }
+            }*/
+        }
+    }
     float checkerboardDist = std::numeric_limits<float>::max();
     if (fabs(dir.y) > 0.001) {
         float d = -(orig.y + 4) / dir.y;
         vec3 pt = orig + dir * d;
-        if (d > 0 && fabs(pt.x) < 10 && pt.z < -10 && pt.z > -30 && d < spheresDist && d < trianglesDist) {
+        if (d > 0 && fabs(pt.x) < 10 && pt.z < -10 && pt.z > -30 && d < modelsDist &&
+            d < spheresDist && d < trianglesDist) {
             checkerboardDist = d;
             hit = pt;
             N = vec3(0, 1, 0);
@@ -84,16 +111,16 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere>
                 vec3(.3, .3, .3) : vec3(.3, .2, .1);
         }
     }
-    return std::min(trianglesDist, std::min(spheresDist, checkerboardDist)) < 1000;
+    return std::min(modelsDist, std::min(trianglesDist, std::min(spheresDist, checkerboardDist))) < 1000;
 }
 
 vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &spheres,
-              const std::deque<Triangle> &triangles,
+              const std::deque<Triangle> &triangles, const std::vector<Model> &models,
               const std::vector<Light> &lights, size_t depth = 0) {
     vec3 point, N;
     Material material;
 
-    if (depth > 4 || !sceneIntersect(orig, dir, spheres, triangles, point, N, material)) {
+    if (depth > 4 || !sceneIntersect(orig, dir, spheres, triangles, models, point, N, material)) {
         Sphere env(vec3(0,0,0), 100, Material());
         float dist = 0;
         env.rayIntersect(orig, dir, dist);
@@ -106,8 +133,8 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &sphe
     vec3 refractDir = normalize(refract(dir, N, material.refractive));
     vec3 reflectOrig = dot(reflectDir, N) < 0.0f ? point - N * 0.001f : point + N * 0.001f;
     vec3 refractOrig = dot(refractDir, N) < 0.0f ? point - N * 0.001f : point + N * 0.001f;
-    vec3 reflectColor = traceRay(reflectOrig, reflectDir, spheres, triangles, lights, depth + 1);
-    vec3 refractColor = traceRay(refractOrig, refractDir, spheres, triangles, lights, depth + 1); 
+    vec3 reflectColor = traceRay(reflectOrig, reflectDir, spheres, triangles, models, lights, depth + 1);
+    vec3 refractColor = traceRay(refractOrig, refractDir, spheres, triangles, models, lights, depth + 1); 
     float diffuseLightIntensity = 0;
     float specularLightIntensity = 0;
     for (auto &light: lights) {
@@ -116,7 +143,7 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const std::vector<Sphere> &sphe
         vec3 shadowOrig = dot(lightDir, N) < 0 ? point - N * 0.001f : point + N * 0.001f;
         vec3 shadowPt, shadowN;
         Material tmpmaterial;
-        if (sceneIntersect(shadowOrig, lightDir, spheres, triangles, shadowPt, shadowN, tmpmaterial) &&
+        if (sceneIntersect(shadowOrig, lightDir, spheres, triangles, models, shadowPt, shadowN, tmpmaterial) &&
             distance(shadowPt, shadowOrig) < lightDistance)
             continue;
 
@@ -167,6 +194,8 @@ void render(Settings &settings) {
     std::deque<Triangle> triangles = loadTriangles(materials);
     std::vector<Light> lights = loadLights();
     Model bunny("../resources/bunny.obj", 100.0f, materials["ivory"]);
+    std::vector<Model> models;
+    models.push_back(bunny);
     //triangles.insert(triangles.begin(), bunny.triangles.begin(), bunny.triangles.end());
 
     const float fov = M_PI / 3.0f;
@@ -183,7 +212,7 @@ void render(Settings &settings) {
                 float y = -(i + 0.5f) + height / 2.0f;
                 float z = -height / (2.0f * tan(fov / 2.0f));
                 vec3 dir = normalize(vec3(x, y, z));
-                frameBuffer[i * width + j] = traceRay(camera, dir, spheres, bunny.triangles, lights);
+                frameBuffer[i * width + j] = traceRay(camera, dir, spheres, triangles, models, lights);
             //}
             //frameBuffer[i * width + j] /= (float) samples;
         }
@@ -247,6 +276,8 @@ int main(int argc, char **argv) {
     }
     procsNum = omp_get_num_procs();
     omp_set_num_threads(procsNum);
+    Cube cube(vec3(0, 0, 0), vec3(1, 1, 1), Material());
+    cube.printFaces();
     int n = -1;
     unsigned char *pixmap = stbi_load("../resources/map3.jpg", &envmap_width, &envmap_height, &n, 0);
     if (!pixmap || 3!=n) {

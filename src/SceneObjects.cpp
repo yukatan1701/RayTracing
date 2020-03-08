@@ -51,18 +51,55 @@ std::deque<Triangle> Quadrangle::toTriangles() const {
 }
 
 bool Quadrangle::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
-        Triangle t0(v0, v1, v2), t1(v0, v2, v3);
-        float dist0, dist1;
-        if (t0.rayIntersect(orig, dir, dist0)) {
-            dist = dist0;
-            return true;
-        }
-        if (t1.rayIntersect(orig, dir, dist1)) {
-            dist = dist1;
-            return true;
-        }
-        return false;
+    Triangle t0(v0, v1, v2), t1(v0, v2, v3);
+    float dist0, dist1;
+    if (t0.rayIntersect(orig, dir, dist0)) {
+        dist = dist0;
+        return true;
     }
+    if (t1.rayIntersect(orig, dir, dist1)) {
+        dist = dist1;
+        return true;
+    }
+    return false;
+}
+
+Cube::Cube(const vec3 &leftBottom, const vec3 &rightTop,
+           const Material &m = Material()) : material(m){
+    float minX = leftBottom.x, minY = leftBottom.y, minZ = leftBottom.z;
+    float maxX = rightTop.x, maxY = rightTop.y, maxZ = rightTop.z;
+    std::vector<vec3> &bv = bottomVerts;
+    std::vector<vec3> &tv = topVerts;
+    bv.push_back(vec3(minX, minY, minZ));
+    bv.push_back(vec3(maxX, minY, minZ));
+    bv.push_back(vec3(maxX, maxY, minZ));
+    bv.push_back(vec3(minX, maxY, minZ));
+    tv.push_back(vec3(minX, minY, maxZ));
+    tv.push_back(vec3(maxX, minY, maxZ));
+    tv.push_back(vec3(maxX, maxY, maxZ));
+    tv.push_back(vec3(minX, maxY, maxZ));
+    
+    std::vector<vec3> f1 { bv[0], bv[1], tv[1], tv[0] };
+    std::vector<vec3> f2 { bv[1], bv[2], tv[2], tv[1] };
+    std::vector<vec3> f3 { bv[2], bv[3], tv[3], tv[2] };
+    std::vector<vec3> f4 { bv[3], bv[0], tv[0], tv[3] };
+    
+    faces.push_front(Quadrangle(bottomVerts, material));
+    faces.push_front(Quadrangle(topVerts, material));
+    faces.push_front(Quadrangle(f1, material));
+    faces.push_front(Quadrangle(f2, material));
+    faces.push_front(Quadrangle(f3, material));
+    faces.push_front(Quadrangle(f4, material));
+}
+
+bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
+    
+    for (auto f: faces) {
+        if (f.rayIntersect(orig, dir, dist))
+            return true;
+    }
+    return false;
+}
 
 Model::Model(const std::string &filename, const float &scale,
              const Material &m = Material()) : scale(scale), material(m) {
@@ -91,12 +128,11 @@ Model::Model(const std::string &filename, const float &scale,
         max_y = std::max(max_y, v.y);
         max_z = std::max(max_z, v.z);
         vertices.push_back(v);
-        //if (n-- > 0) {
-            //std::cout << v.x << " " << v.y << " " << v.z << std::endl;
-        //}
     }
     std::cout << min_x << " " << min_y << " " << min_z << std::endl;
     std::cout << max_x << " " << max_y << " " << max_z << std::endl;
+    coveringCube = Cube(vec3(min_x, min_y, min_z), vec3(max_x, max_y, max_z));
+    coveringCube.printCube();
     while (faceNum--) {
         int ix, iy, iz;
         char ch = 0;
@@ -106,4 +142,8 @@ Model::Model(const std::string &filename, const float &scale,
         triangles.push_front(tr);
     } 
     file.close();
+}
+
+bool Model::cubeIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
+    return coveringCube.rayIntersect(orig, dir, dist);
 }
