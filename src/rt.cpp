@@ -16,6 +16,7 @@
 #include "ParseException.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#include "Scene.h"
 
 const int width = 1024;
 const int height = 768;
@@ -26,15 +27,6 @@ int envmap_width, envmap_height;
 std::vector<vec3> envmap;
 
 using namespace glm;
-
-struct Settings {
-    std::string out;
-    unsigned int scene;
-    unsigned int threads;
-    Settings() : out("rt.bmp"), scene(1), threads(1) {}
-    Settings(std::string out, unsigned int scene, unsigned int threads) :
-        out(out), scene(scene), threads(threads) {}
-};
 
 vec3 reflect(const vec3 &i, const vec3 &n) {
     return i - n * 2.0f * dot(i, n);
@@ -73,19 +65,9 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere>
         }
     }
     float modelsDist = std::numeric_limits<float>::max();
-    int n = 1;
     for (auto &model : models) {
-        float curDist;
-        if (model.cubeIntersect(orig, dir, curDist) && curDist < modelsDist &&
-                    curDist < trianglesDist && curDist < spheresDist) {
-            if (n == 1) {
-                //std::cout << "Success!" << std::endl;
-            }
-            modelsDist = curDist;
-            hit = orig + dir * curDist;
-            N = vec3(0, -1, 0);
-            material = Material();
-            /*
+        float tmpDist;
+        //if (model.cubeIntersect(orig, dir, tmpDist)) {
             for (auto &triangle : model.triangles) {
                 float curDist;
                 if (triangle.rayIntersect(orig, dir, curDist) && curDist < modelsDist &&
@@ -95,8 +77,8 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const std::vector<Sphere>
                     N = triangleNormal(triangle.v0, triangle.v1, triangle.v2);
                     material = triangle.material;
                 }
-            }*/
-        }
+            }
+        //}
     }
     float checkerboardDist = std::numeric_limits<float>::max();
     if (fabs(dir.y) > 0.001) {
@@ -193,7 +175,7 @@ void render(Settings &settings) {
     std::vector<Sphere> spheres = loadSpheres(materials);
     std::deque<Triangle> triangles = loadTriangles(materials);
     std::vector<Light> lights = loadLights();
-    Model bunny("../resources/bunny.obj", 100.0f, materials["ivory"]);
+    Model bunny("../resources/bunny.obj", 40.0f, materials["ivory"]);
     std::vector<Model> models;
     models.push_back(bunny);
     //triangles.insert(triangles.begin(), bunny.triangles.begin(), bunny.triangles.end());

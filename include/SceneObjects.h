@@ -87,7 +87,7 @@ struct Cube {
 };
 
 struct Model {
-    Cube coveringCube;
+    Cube boundingCube;
     std::deque<Triangle> triangles;
     float scale;
     Material material;

@@ -114,7 +114,7 @@ Model::Model(const std::string &filename, const float &scale,
     float min_x, min_y, min_z, max_x, max_y, max_z;
     min_x = min_y = min_z = 1000;
     max_x = max_y = max_z = -1000;
-    vec3 bias(4.0f, -7.0f, -30.0f);
+    vec3 bias(4.0f, -7.0f + 1.6f, -25.0f);
     while (vertNum--) {
         double x = 0.0, y = 0.0, z = 0.0;
         char ch = 0;
@@ -131,8 +131,8 @@ Model::Model(const std::string &filename, const float &scale,
     }
     std::cout << min_x << " " << min_y << " " << min_z << std::endl;
     std::cout << max_x << " " << max_y << " " << max_z << std::endl;
-    coveringCube = Cube(vec3(min_x, min_y, min_z), vec3(max_x, max_y, max_z));
-    coveringCube.printCube();
+    boundingCube = Cube(vec3(min_x, min_y, min_z), vec3(max_x, max_y, max_z));
+    boundingCube.printCube();
     while (faceNum--) {
         int ix, iy, iz;
         char ch = 0;
@@ -145,5 +145,5 @@ Model::Model(const std::string &filename, const float &scale,
 }
 
 bool Model::cubeIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
-    return coveringCube.rayIntersect(orig, dir, dist);
+    return boundingCube.rayIntersect(orig, dir, dist);
 }
