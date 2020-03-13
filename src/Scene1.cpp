@@ -181,7 +181,7 @@ std::deque<Triangle> loadTriangles(const Materials &materials) {
 
 std::deque<Model> loadModels(const Materials &materials) {
     std::deque<Model> models;
-    vec3 bias(4.0f, -7.0f + 1.6f, -25.0f);
+    vec3 bias(4.0f, -7.0f + 1.7f, -25.0f);
     Model bunny("../resources/bunny.obj", 40.0f, bias, materials["gold"]);
     models.push_front(bunny);
     return models;
