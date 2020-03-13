@@ -1,5 +1,5 @@
 #include "SceneObjects.h"
-#include "glm/detail/func_geometric.inl"
+#include "glm/gtx/normal.hpp"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -50,14 +50,16 @@ std::deque<Triangle> Quadrangle::toTriangles() const {
     return tr;
 }
 
-bool Quadrangle::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
+bool Quadrangle::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
     Triangle t0(v0, v1, v2), t1(v0, v2, v3);
     float dist0, dist1;
     if (t0.rayIntersect(orig, dir, dist0)) {
+        n = triangleNormal(t0.v0, t0.v1, t0.v2);
         dist = dist0;
         return true;
     }
     if (t1.rayIntersect(orig, dir, dist1)) {
+        n = triangleNormal(t1.v0, t1.v1, t1.v2);
         dist = dist1;
         return true;
     }
@@ -66,23 +68,27 @@ bool Quadrangle::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) co
 
 Cube::Cube(const vec3 &leftBottom, const vec3 &rightTop,
            const Material &m = Material()) : material(m){
-    float minX = leftBottom.x, minY = leftBottom.y, minZ = leftBottom.z;
-    float maxX = rightTop.x, maxY = rightTop.y, maxZ = rightTop.z;
+    const vec3 &lb = leftBottom;
+    const vec3 &rt = rightTop;
+    float minX = std::min(lb.x, rt.x), minY = std::min(lb.y, rt.y),
+          minZ = std::min(lb.z, rt.z);
+    float maxX = std::max(lb.x, rt.x), maxY = std::max(lb.y, rt.y),
+          maxZ = std::max(lb.z, rt.z);
     std::vector<vec3> &bv = bottomVerts;
     std::vector<vec3> &tv = topVerts;
     bv.push_back(vec3(minX, minY, minZ));
-    bv.push_back(vec3(maxX, minY, minZ));
-    bv.push_back(vec3(maxX, maxY, minZ));
     bv.push_back(vec3(minX, maxY, minZ));
+    bv.push_back(vec3(maxX, maxY, minZ));
+    bv.push_back(vec3(maxX, minY, minZ));
     tv.push_back(vec3(minX, minY, maxZ));
     tv.push_back(vec3(maxX, minY, maxZ));
     tv.push_back(vec3(maxX, maxY, maxZ));
     tv.push_back(vec3(minX, maxY, maxZ));
     
-    std::vector<vec3> f1 { bv[0], bv[1], tv[1], tv[0] };
-    std::vector<vec3> f2 { bv[1], bv[2], tv[2], tv[1] };
-    std::vector<vec3> f3 { bv[2], bv[3], tv[3], tv[2] };
-    std::vector<vec3> f4 { bv[3], bv[0], tv[0], tv[3] };
+    std::vector<vec3> f1 { bv[0], bv[3], tv[1], tv[0] };
+    std::vector<vec3> f2 { bv[3], bv[2], tv[2], tv[1] };
+    std::vector<vec3> f3 { bv[2], bv[1], tv[3], tv[2] };
+    std::vector<vec3> f4 { bv[1], bv[0], tv[0], tv[3] };
     
     faces.push_front(Quadrangle(bottomVerts, material));
     faces.push_front(Quadrangle(topVerts, material));
@@ -92,17 +98,18 @@ Cube::Cube(const vec3 &leftBottom, const vec3 &rightTop,
     faces.push_front(Quadrangle(f4, material));
 }
 
-bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
-    
+bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
     for (auto f: faces) {
-        if (f.rayIntersect(orig, dir, dist))
+        if (f.rayIntersect(orig, dir, dist, n)) {
             return true;
+        }
     }
     return false;
 }
 
-Model::Model(const std::string &filename, const float &scale,
-             const Material &m = Material()) : scale(scale), material(m) {
+Model::Model(const std::string &filename, const float &scale, const vec3 &offset,
+             const Material &m = Material()) :
+             scale(scale), material(m) {
     std::ifstream file(filename, std::ios::in);
     if (!file.is_open()) {
         std::cerr << "Failed to open '" << filename << "' file." << std::endl;
@@ -114,13 +121,12 @@ Model::Model(const std::string &filename, const float &scale,
     float min_x, min_y, min_z, max_x, max_y, max_z;
     min_x = min_y = min_z = 1000;
     max_x = max_y = max_z = -1000;
-    vec3 bias(4.0f, -7.0f + 1.6f, -25.0f);
     while (vertNum--) {
         double x = 0.0, y = 0.0, z = 0.0;
         char ch = 0;
         file >> ch; // v
         file >> x >> y >> z;
-        vec3 v = vec3((float) x, (float) y, (float) z) * scale + bias;
+        vec3 v = vec3((float) x, (float) y, (float) z) * scale + offset;
         min_x = std::min(min_x, v.x);
         min_y = std::min(min_y, v.y);
         min_z = std::min(min_z, v.z);
@@ -132,7 +138,7 @@ Model::Model(const std::string &filename, const float &scale,
     std::cout << min_x << " " << min_y << " " << min_z << std::endl;
     std::cout << max_x << " " << max_y << " " << max_z << std::endl;
     boundingCube = Cube(vec3(min_x, min_y, min_z), vec3(max_x, max_y, max_z));
-    boundingCube.printCube();
+    //boundingCube.printCube();
     while (faceNum--) {
         int ix, iy, iz;
         char ch = 0;
@@ -144,6 +150,6 @@ Model::Model(const std::string &filename, const float &scale,
     file.close();
 }
 
-bool Model::cubeIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
-    return boundingCube.rayIntersect(orig, dir, dist);
+bool Model::cubeIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
+    return boundingCube.rayIntersect(orig, dir, dist, n);
 }

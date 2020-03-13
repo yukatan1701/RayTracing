@@ -5,8 +5,8 @@
 
 class Scene1 : public Scene {
 public:
-    Scene1(const std::string &description) : Scene(description) {}
-    void run(const Settings &s) const;
+    Scene1(const std::string &description = "description") : Scene(description) {}
+    int run(const Settings &s) const;
 };
 
 #endif

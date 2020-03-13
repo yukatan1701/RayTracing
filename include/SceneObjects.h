@@ -46,7 +46,7 @@ struct Quadrangle {
         v0(v[0]), v1(v[1]), v2(v[2]), v3(v[3]), material(m) {}
 
     std::deque<Triangle> toTriangles() const;
-    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
+    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
     void print() const {
         printf("(%.3f, %.3f, %.3f) ", v0.x, v0.y, v0.z);
         printf("(%.3f, %.3f, %.3f) ", v1.x, v1.y, v1.z);
@@ -67,7 +67,7 @@ struct Cube {
     Material material;
     Cube() {}
     Cube(const vec3 &leftBottom, const vec3 &rightTop, const Material &m);
-    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
+    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
     void printCube() const {
         std::cout << "[";
         for (auto vec : topVerts) {
@@ -92,8 +92,20 @@ struct Model {
     float scale;
     Material material;
     Model(const std::string &filename, const float &scale,
-          const Material &m);
-    bool cubeIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
+          const vec3 &offset, const Material &m);
+    bool cubeIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
+};
+
+struct SceneObjects {
+    const std::deque<Sphere> &spheres;
+    const std::deque<Triangle> &triangles;
+    const std::deque<Light> &lights;
+    const std::deque<Model> &models;
+    const std::deque<Cube> &cubes;
+    SceneObjects(const std::deque<Sphere> &s, const std::deque<Triangle> &t,
+                 const std::deque<Light> &l, const std::deque<Model> &m,
+                 const std::deque<Cube> &c) :
+                 spheres(s), triangles(t), lights(l), models(m), cubes(c) {}
 };
 
 #endif
