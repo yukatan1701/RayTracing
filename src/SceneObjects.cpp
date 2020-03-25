@@ -70,13 +70,15 @@ bool Quadrangle::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, ve
     return false;
 }
 
-void Cube::loadFaces(const vec3 &leftBottom, const vec3 &rightTop) {
-    const vec3 &lb = leftBottom;
-    const vec3 &rt = rightTop;
-    float minX = std::min(lb.x, rt.x), minY = std::min(lb.y, rt.y),
-          minZ = std::min(lb.z, rt.z);
-    float maxX = std::max(lb.x, rt.x), maxY = std::max(lb.y, rt.y),
-          maxZ = std::max(lb.z, rt.z);
+void Cube::loadFaces(const vec3 &minPoint, const vec3 &maxPoint) {
+    const vec3 &minP = minPoint;
+    const vec3 &maxP = maxPoint;
+    float minX = std::min(minP.x, maxP.x), minY = std::min(minP.y, maxP.y),
+          minZ = std::min(minP.z, maxP.z);
+    float maxX = std::max(minP.x, maxP.x), maxY = std::max(minP.y, maxP.y),
+          maxZ = std::max(minP.z, maxP.z);
+    Cube::minPoint = vec3(minX, minY, minZ);
+    Cube::maxPoint = vec3(maxX, maxY, maxZ);
     std::vector<vec3> &bv = bottomVerts;
     std::vector<vec3> &tv = topVerts;
     bv.push_back(vec3(minX, minY, minZ));
@@ -111,13 +113,90 @@ Cube::Cube(const vec3 &leftBottom, const vec3 &rightTop,
     loadFaces(leftBottom, rightTop);
 }
 
-bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
-    for (auto f: faces) {
-        if (f.rayIntersect(orig, dir, dist, n)) {
+bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
+    // orig point inside the cude
+    if (orig.x >= minPoint.x && orig.x <= maxPoint.x &&
+        orig.y >= minPoint.y && orig.y <= maxPoint.y &&
+        orig.z >= minPoint.z && orig.z <= maxPoint.z) {
             return true;
         }
+    float t_near = std::numeric_limits<float>::min();
+    float t_far = std::numeric_limits<float>::max();
+    float t1, t2;
+    float eps = std::numeric_limits<float>::epsilon();
+
+    for (int i = 0; i < 3; ++i) {
+        if (abs(dir[i]) >= eps) {
+            t1 = (minPoint[i] - orig[i]) / dir[i];
+            t2 = (maxPoint[i] - orig[i]) / dir[i];
+
+            if (t1 > t2)
+                std::swap(t1, t2);
+            if (t1 > t_near)
+                t_near = t1;
+            if (t2 < t_far)
+                t_far = t2;
+
+            if (t_near > t_far)
+                return false;
+            if (t_far < std::numeric_limits<float>::epsilon())
+                return false;
+        } else {
+            if (orig[i] < minPoint[i] || orig[i] > maxPoint[i])
+                return false;
+        }
     }
-    return false;
+    if (!(t_near <= t_far && t_far >= eps))
+        return false;
+    return true;
+}
+
+bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
+    // orig point inside the cude
+    if (orig.x >= minPoint.x && orig.x <= maxPoint.x &&
+        orig.y >= minPoint.y && orig.y <= maxPoint.y &&
+        orig.z >= minPoint.z && orig.z <= maxPoint.z) {
+            return true;
+        }
+    float t_near = std::numeric_limits<float>::min();
+    float t_far = std::numeric_limits<float>::max();
+    float t1, t2;
+    float eps = std::numeric_limits<float>::epsilon();
+
+    for (int i = 0; i < 3; ++i) {
+        if (abs(dir[i]) >= eps) {
+            t1 = (minPoint[i] - orig[i]) / dir[i];
+            t2 = (maxPoint[i] - orig[i]) / dir[i];
+
+            if (t1 > t2)
+                std::swap(t1, t2);
+            if (t1 > t_near)
+                t_near = t1;
+            if (t2 < t_far)
+                t_far = t2;
+
+            if (t_near > t_far)
+                return false;
+            if (t_far < 0.0f - std::numeric_limits<float>::epsilon())
+                return false;
+        } else {
+            if (orig[i] < minPoint[i] || orig[i] > maxPoint[i])
+                return false;
+        }
+    }
+    if (!(t_near <= t_far && t_far >= eps))
+        return false;
+        
+    dist = t_near;
+    vec3 hit = orig + dir * dist;
+    vec3 c = (minPoint + maxPoint) * 0.5f;
+    vec3 d = (minPoint - maxPoint) * 0.5f;
+    vec3 p = hit - c;
+    float bias = 1.000001f;
+    n = normalize(vec3(trunc(p.x / abs(d.x) * bias),
+                       trunc(p.y / abs(d.y) * bias),
+                       trunc(p.z / abs(d.z) * bias)));
+    return true;
 }
 
 bool Cube::isInCube(const vec3 &v) const {

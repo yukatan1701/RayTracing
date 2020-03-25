@@ -3,7 +3,10 @@
 #include <vector>
 #include <limits>
 #include <cmath>
-//#include <omp.h>
+#include <ctime>
+#include <sys/time.h>
+//#define OPENMP
+#include <omp.h>
 #include <set>
 #include "bitmap_image.hpp"
 #include "glm/vec2.hpp"
@@ -20,10 +23,29 @@
 const int width = 512;
 const int height = 512;
 
+double bench_t_start, bench_t_end;
+
 int envmap_width, envmap_height;
 std::vector<vec3> envmap;
 
 using namespace glm;
+
+static double rtclock() {
+    struct timeval Tp;
+    int stat;
+    stat = gettimeofday (&Tp, NULL);
+    if (stat != 0)
+      printf ("Error return from gettimeofday: %d", stat);
+    return (Tp.tv_sec + Tp.tv_usec * 1.0e-6);
+}
+
+void bench_timer_start() {
+  bench_t_start = rtclock ();
+}
+
+void bench_timer_stop() {
+  bench_t_end = rtclock ();
+}
 
 vec3 reflect(const vec3 &i, const vec3 &n) {
     return i - n * 2.0f * dot(i, n);
@@ -40,7 +62,7 @@ vec3 refract(const vec3 &I, const vec3 &N, const float etat, const float etai = 
 
 bool sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObjects &sceneObjects,
                     vec3 &hit, vec3 &N, Material &material) {
-    std::set<float> distances;
+    float min_dist = std::numeric_limits<float>::max();
     float spheresDist = std::numeric_limits<float>::max();
     for (auto &sphere: sceneObjects.spheres) {
         float curDist;
@@ -51,31 +73,32 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObjects &scene
             material = sphere.material;
         }
     }
-    distances.insert(spheresDist);
+    min_dist = std::min(spheresDist, min_dist);
     float trianglesDist = std::numeric_limits<float>::max();
     for (auto &triangle : sceneObjects.triangles) {
         float curDist;
-        if (triangle.rayIntersect(orig, dir, curDist) && curDist < trianglesDist && curDist < *distances.begin()) {
+        if (triangle.rayIntersect(orig, dir, curDist) && curDist < trianglesDist && curDist < min_dist) {
             trianglesDist = curDist;
             hit = orig + dir * curDist;
             N = triangleNormal(triangle.v0, triangle.v1, triangle.v2);
             material = triangle.material;
         }
     }
-    distances.insert(trianglesDist);
-   /* float cubesDist = std::numeric_limits<float>::max();
+    min_dist = std::min(trianglesDist, min_dist);
+    float cubesDist = std::numeric_limits<float>::max();
     for (auto &cube : sceneObjects.cubes) {
         float curDist;
-        vec3 normal;
+        vec3 normal = vec3(0, 0, 1);
         if (cube.rayIntersect(orig, dir, curDist, normal) && curDist < cubesDist &&
-            curDist < *distances.begin()) {
+            curDist < min_dist) {
             cubesDist = curDist;
             hit = orig + dir * curDist;
             N = normal;
             material = cube.material;
         }
     }
-    distances.insert(cubesDist);
+    min_dist = std::min(cubesDist, min_dist);
+    /*
     float modelsDist = std::numeric_limits<float>::max();
     for (auto &model : sceneObjects.models) {
         float boxDist, curDist;
@@ -123,7 +146,7 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObjects &scene
     if (fabs(dir.y) > 0.001) {
         float d = -(orig.y + 4) / dir.y;
         vec3 pt = orig + dir * d;
-        if (d > 0 && fabs(pt.x) < 10 && pt.z < -10 && pt.z > -30 && d < *distances.begin()) {
+        if (d > 0 && fabs(pt.x) < 10 && pt.z < -10 && pt.z > -30 && d < min_dist) {
             checkerboardDist = d;
             hit = pt;
             N = vec3(0, 1, 0);
@@ -131,8 +154,8 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObjects &scene
                 vec3(.3, .3, .3) : vec3(.3, .2, .1);
         }
     }
-    distances.insert(checkerboardDist);
-    return *distances.begin() < 1000;
+    min_dist = std::min(checkerboardDist, min_dist);
+    return min_dist < 1000;
 }
 
 vec3 traceRay(const vec3 &orig, const vec3 &dir, const SceneObjects &sceneObjects,
@@ -220,17 +243,19 @@ void render(const Settings &settings) {
     std::deque<Triangle> triangles = loadTriangles(materials);
     std::deque<Light> lights = loadLights();
     std::deque<Model> models = loadModels(materials);
-    /*Cube cube(vec3(-6, -4, -20), vec3(-3, -1, -23), materials["silver"]);
+    Cube cube(vec3(-6, -4, -20), vec3(-3, -1, -23), materials["silver"]);
     std::deque<Cube> cubes { cube };
-    cube.printFaces();*/
-    std::deque<Cube> cubes;
+    //cube.printFaces();
+    //std::deque<Cube> cubes;
     SceneObjects sceneObjects(spheres, triangles, lights, models, cubes);
 
     const float fov = M_PI / 3.0f;
     std::vector<vec3> frameBuffer(width * height);
 
     vec3 camera(0, 5, 0);
-//#pragma omp parallel for schedule(static)
+#ifdef OPENMP
+#pragma omp parallel for schedule(static)
+#endif
     for (size_t i = 0; i < height; ++i) {
         for (size_t j = 0; j < width; ++j) {
             float x =  (j + 0.5f) -  width / 2.0f;
@@ -260,7 +285,10 @@ void render(const Settings &settings) {
 }
 
 int Scene1::run(const Settings &settings) const {
-    //omp_set_num_threads(settings.threads);
+    #ifdef OPENMP
+    omp_set_num_threads(settings.threads);
+    #endif
+
     int n = -1;
     unsigned char *pixmap = stbi_load("../resources/map3.jpg", &envmap_width, &envmap_height, &n, 0);
     if (!pixmap || 3!=n) {
@@ -282,9 +310,20 @@ int Scene1::run(const Settings &settings) const {
     std::cout << "Threads: " << settings.threads << std::endl;
     //std::cout << "Real threads: " << omp_get_max_threads() << std::endl;
     std::cout << "\nRendering image..." << std::endl;
-    //double time0 = omp_get_wtime();
+    #ifdef OPENMP
+    double time0 = omp_get_wtime();
+    #endif
+    #ifndef OPENMP
+    bench_timer_start();
+    #endif
     render(settings);
-    //double time1 = omp_get_wtime();
-    //std::cout << "Done. Elapsed time: " << time1 - time0 << std::endl;
+    #ifdef OPENMP
+    double time1 = omp_get_wtime();
+    std::cout << "Done. Elapsed time: " << time1 - time0 << std::endl;
+    #endif
+    #ifndef OPENMP
+    bench_timer_stop();
+    printf ("Time in seconds = %0.6lf\n", bench_t_end - bench_t_start);
+    #endif
     return 0;
 }

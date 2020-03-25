@@ -63,6 +63,7 @@ struct Light {
 };
 
 struct Cube {
+    vec3 minPoint, maxPoint;
     std::vector<vec3> topVerts, bottomVerts;
     std::deque<Quadrangle> faces;
     std::pair<float, float> dx, dy, dz;
@@ -70,6 +71,7 @@ struct Cube {
     Cube() {}
     Cube(const vec3 &leftBottom, const vec3 &rightTop, const Material &m);
     void loadFaces(const vec3 &leftBottom, const vec3 &rightTop);
+    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
     bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
     void printCube() const {
         std::cout << "[";
