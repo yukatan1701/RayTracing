@@ -6,6 +6,10 @@
 
 using namespace glm;
 
+void pvec(const vec3 &vec) {
+    printf("(%.3f, %.3f, %.3f)", vec.x, vec.y, vec.z);
+}
+
 bool Sphere::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
     float Epsilon = std::numeric_limits<float>::epsilon();
     vec3 diff = center - orig;
@@ -66,8 +70,7 @@ bool Quadrangle::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, ve
     return false;
 }
 
-Cube::Cube(const vec3 &leftBottom, const vec3 &rightTop,
-           const Material &m = Material()) : material(m){
+void Cube::loadFaces(const vec3 &leftBottom, const vec3 &rightTop) {
     const vec3 &lb = leftBottom;
     const vec3 &rt = rightTop;
     float minX = std::min(lb.x, rt.x), minY = std::min(lb.y, rt.y),
@@ -84,7 +87,12 @@ Cube::Cube(const vec3 &leftBottom, const vec3 &rightTop,
     tv.push_back(vec3(maxX, minY, maxZ));
     tv.push_back(vec3(maxX, maxY, maxZ));
     tv.push_back(vec3(minX, maxY, maxZ));
-    
+
+    dx = std::pair<float, float>(minX, maxX);
+    dy = std::pair<float, float>(minY, maxY);
+    dz = std::pair<float, float>(minZ, maxZ);
+    //printf("[%.3f][%.3f][%.3f]\n", dx.first, dy.first, dz.first);
+
     std::vector<vec3> f1 { bv[0], bv[3], tv[1], tv[0] };
     std::vector<vec3> f2 { bv[3], bv[2], tv[2], tv[1] };
     std::vector<vec3> f3 { bv[2], bv[1], tv[3], tv[2] };
@@ -98,6 +106,11 @@ Cube::Cube(const vec3 &leftBottom, const vec3 &rightTop,
     faces.push_front(Quadrangle(f4, material));
 }
 
+Cube::Cube(const vec3 &leftBottom, const vec3 &rightTop,
+           const Material &m = Material()) : material(m){
+    loadFaces(leftBottom, rightTop);
+}
+
 bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
     for (auto f: faces) {
         if (f.rayIntersect(orig, dir, dist, n)) {
@@ -105,6 +118,59 @@ bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n)
         }
     }
     return false;
+}
+
+bool Cube::isInCube(const vec3 &v) const {
+
+}
+
+void BoundingBox::init() {
+    float lx = dx.second - dx.first, ly = dy.second - dy.first, lz = dz.second - dz.first;
+    float px = lx / float(size), py = ly / float(size), pz = lz / float(size);
+    float x = dx.first, y = dy.first, z = dz.first;
+    vec3 leftBottom, rightTop;
+    for (int i = 0; i < size; i++) {
+        leftBottom.x = x, rightTop.x = x + px;
+        for (int j = 0; j < size; j++) {
+            leftBottom.y = y, rightTop.y = y + py;
+            for (int k = 0; k < size; k++) {
+                leftBottom.z = z, rightTop.z = z + pz;
+                grid[i][j][k].loadFaces(leftBottom, rightTop);
+                z += pz;
+            }
+            y += py;
+        }
+        x += px;
+    }
+}
+
+void BoundingBox::initTriangles(const std::deque<Triangle> &trs) {
+    float lx = (dx.second - dx.first) * size;
+    float ly = (dy.second - dy.first) * size;
+    float lz = (dz.second - dz.first) * size;
+    for (auto &t: trs) {
+        const vec3 &v0 = t.v0, &v1 = t.v1, &v2 = t.v2;
+        float fx0 = (v0.x - dx.first) / lx;
+        float fy0 = (v0.y - dy.first) / ly;
+        float fz0 = (v0.z - dz.first) / lz;
+        float fx1 = (v1.x - dx.first) / lx;
+        float fy1 = (v1.y - dy.first) / ly;
+        float fz1 = (v1.z - dz.first) / lz;
+        float fx2 = (v2.x - dx.first) / lx;
+        float fy2 = (v2.y - dy.first) / ly;
+        float fz2 = (v2.z - dz.first) / lz;
+        int i0 = int(fx0), j0 = int(fy0), k0 = int(fz0);
+        int i1 = int(fx1), j1 = int(fy1), k1 = int(fz1);
+        int i2 = int(fx2), j2 = int(fy2), k2 = int(fz2);
+        //if (i > size-1 || j > size-1 || k > size-1)
+        //    printf("%d, %d, %d\n", i, j, k);
+        if (*tgrid[i0][j0][k0].begin() != &t)
+            tgrid[i0][j0][k0].push_front(&t);
+        if (*tgrid[i1][j1][k1].begin() != &t)
+            tgrid[i1][j1][k1].push_front(&t);
+        if (*tgrid[i2][j2][k2].begin() != &t)
+            tgrid[i2][j2][k2].push_front(&t);
+    }
 }
 
 Model::Model(const std::string &filename, const float &scale, const vec3 &offset,
@@ -137,7 +203,9 @@ Model::Model(const std::string &filename, const float &scale, const vec3 &offset
     }
     std::cout << min_x << " " << min_y << " " << min_z << std::endl;
     std::cout << max_x << " " << max_y << " " << max_z << std::endl;
-    boundingCube = Cube(vec3(min_x, min_y, min_z), vec3(max_x, max_y, max_z));
+    float eps = 0.0001f;
+    vec3 veps(eps);
+    box.loadFaces(vec3(min_x, min_y, min_z) - veps, vec3(max_x, max_y, max_z) + veps);
     //boundingCube.printCube();
     while (faceNum--) {
         int ix, iy, iz;
@@ -148,8 +216,10 @@ Model::Model(const std::string &filename, const float &scale, const vec3 &offset
         triangles.push_front(tr);
     } 
     file.close();
+    box.init();
+    box.initTriangles(triangles);
 }
 
-bool Model::cubeIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
-    return boundingCube.rayIntersect(orig, dir, dist, n);
+bool Model::boxIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
+    return box.rayIntersect(orig, dir, dist, n);
 }

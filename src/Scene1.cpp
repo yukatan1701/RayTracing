@@ -3,7 +3,7 @@
 #include <vector>
 #include <limits>
 #include <cmath>
-#include <omp.h>
+//#include <omp.h>
 #include <set>
 #include "bitmap_image.hpp"
 #include "glm/vec2.hpp"
@@ -63,7 +63,7 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObjects &scene
         }
     }
     distances.insert(trianglesDist);
-    float cubesDist = std::numeric_limits<float>::max();
+   /* float cubesDist = std::numeric_limits<float>::max();
     for (auto &cube : sceneObjects.cubes) {
         float curDist;
         vec3 normal;
@@ -78,10 +78,35 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObjects &scene
     distances.insert(cubesDist);
     float modelsDist = std::numeric_limits<float>::max();
     for (auto &model : sceneObjects.models) {
-        float tmpDist;
+        float boxDist, curDist;
         vec3 n;
-        if (model.cubeIntersect(orig, dir, tmpDist, n)) {
-            for (auto &triangle : model.triangles) {
+        if (model.boxIntersect(orig, dir, boxDist, n)) {
+            vec3 hitPoint = orig + dir * boxDist;
+            int size = model.box.size;
+            size = 2;
+            int begin = 1;
+            for (int i = 0; i < size; i++) {
+                for (int j = 0; j < 1; j++) {
+                    for (int k = 0; k < 1; k++) {
+                        if (model.box.grid[i][j][k].rayIntersect(orig, dir, boxDist, n)) {
+                            modelsDist = boxDist;
+                            hit = orig + dir * boxDist;
+                            N = n;
+                            //material = model.box.grid[i][j][k].material;
+                            /*for (const Triangle *triangle : model.box.tgrid[i][j][k]) {  
+                                if (triangle->rayIntersect(orig, dir, curDist) && curDist < modelsDist &&
+                                    curDist < *distances.begin()) {
+                                    modelsDist = curDist;
+                                    hit = orig + dir * curDist;
+                                    N = triangleNormal(triangle->v0, triangle->v1, triangle->v2);
+                                    material = triangle->material;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            /*for (auto &triangle : model.triangles) {
                 float curDist;
                 if (triangle.rayIntersect(orig, dir, curDist) && curDist < modelsDist &&
                     curDist < *distances.begin()) {
@@ -93,7 +118,7 @@ bool sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObjects &scene
             }
         }
     }
-    distances.insert(modelsDist);
+    distances.insert(modelsDist);*/
     float checkerboardDist = std::numeric_limits<float>::max();
     if (fabs(dir.y) > 0.001) {
         float d = -(orig.y + 4) / dir.y;
@@ -154,6 +179,8 @@ vec3 traceRay(const vec3 &orig, const vec3 &dir, const SceneObjects &sceneObject
 std::deque<Sphere> loadSpheres(const Materials &materials) {
     std::deque<Sphere> spheres;
     spheres.push_front(Sphere(vec3( 7, 5, -18), 4, materials["mirror"]));
+    spheres.push_front(Sphere(vec3( 14, 5, -25), 4, materials["glass"]));
+    spheres.push_front(Sphere(vec3( -7, 5, -20), 4, materials["red_rubber"]));
     return spheres;
 }
 
@@ -181,9 +208,9 @@ std::deque<Triangle> loadTriangles(const Materials &materials) {
 
 std::deque<Model> loadModels(const Materials &materials) {
     std::deque<Model> models;
-    vec3 bias(4.0f, -7.0f + 1.7f, -25.0f);
+    /*vec3 bias(4.0f, -7.0f + 1.7f, -25.0f);
     Model bunny("../resources/bunny.obj", 40.0f, bias, materials["gold"]);
-    models.push_front(bunny);
+    models.push_front(bunny);*/
     return models;
 }
 
@@ -193,16 +220,17 @@ void render(const Settings &settings) {
     std::deque<Triangle> triangles = loadTriangles(materials);
     std::deque<Light> lights = loadLights();
     std::deque<Model> models = loadModels(materials);
-    Cube cube(vec3(-6, -4, -20), vec3(-3, -1, -23), materials["silver"]);
+    /*Cube cube(vec3(-6, -4, -20), vec3(-3, -1, -23), materials["silver"]);
     std::deque<Cube> cubes { cube };
-    cube.printFaces();
+    cube.printFaces();*/
+    std::deque<Cube> cubes;
     SceneObjects sceneObjects(spheres, triangles, lights, models, cubes);
 
     const float fov = M_PI / 3.0f;
     std::vector<vec3> frameBuffer(width * height);
 
     vec3 camera(0, 5, 0);
-#pragma omp parallel for schedule(static)
+//#pragma omp parallel for schedule(static)
     for (size_t i = 0; i < height; ++i) {
         for (size_t j = 0; j < width; ++j) {
             float x =  (j + 0.5f) -  width / 2.0f;
@@ -232,7 +260,7 @@ void render(const Settings &settings) {
 }
 
 int Scene1::run(const Settings &settings) const {
-    omp_set_num_threads(settings.threads);
+    //omp_set_num_threads(settings.threads);
     int n = -1;
     unsigned char *pixmap = stbi_load("../resources/map3.jpg", &envmap_width, &envmap_height, &n, 0);
     if (!pixmap || 3!=n) {
@@ -252,11 +280,11 @@ int Scene1::run(const Settings &settings) const {
     std::cout << "Output path: " << settings.out << std::endl;
     std::cout << "Scene number: " << settings.scene << std::endl;
     std::cout << "Threads: " << settings.threads << std::endl;
-    std::cout << "Real threads: " << omp_get_max_threads() << std::endl;
+    //std::cout << "Real threads: " << omp_get_max_threads() << std::endl;
     std::cout << "\nRendering image..." << std::endl;
-    double time0 = omp_get_wtime();
+    //double time0 = omp_get_wtime();
     render(settings);
-    double time1 = omp_get_wtime();
-    std::cout << "Done. Elapsed time: " << time1 - time0 << std::endl;
+    //double time1 = omp_get_wtime();
+    //std::cout << "Done. Elapsed time: " << time1 - time0 << std::endl;
     return 0;
 }

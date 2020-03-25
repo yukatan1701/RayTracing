@@ -5,6 +5,7 @@
 #include "glm/vec3.hpp"
 #include "Material.h"
 #include <deque>
+#include <set>
 #include <iostream>
 #include <vector>
 
@@ -64,9 +65,11 @@ struct Light {
 struct Cube {
     std::vector<vec3> topVerts, bottomVerts;
     std::deque<Quadrangle> faces;
+    std::pair<float, float> dx, dy, dz;
     Material material;
     Cube() {}
     Cube(const vec3 &leftBottom, const vec3 &rightTop, const Material &m);
+    void loadFaces(const vec3 &leftBottom, const vec3 &rightTop);
     bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
     void printCube() const {
         std::cout << "[";
@@ -84,16 +87,28 @@ struct Cube {
             face.print();
         }
     }
+    bool isInCube(const vec3 &v) const;
+};
+
+struct BoundingBox : public Cube {
+    static const int size = 4;
+    Cube grid[size][size][size];
+    std::deque<const Triangle *> tgrid[size][size][size];
+    BoundingBox() : Cube() {}
+    BoundingBox(const vec3 &leftBottom, const vec3 &rightTop) :
+        Cube(leftBottom, rightTop, Material()) {}
+    void init();
+    void initTriangles(const std::deque<Triangle> &trs);
 };
 
 struct Model {
-    Cube boundingCube;
+    BoundingBox box;
     std::deque<Triangle> triangles;
     float scale;
     Material material;
     Model(const std::string &filename, const float &scale,
           const vec3 &offset, const Material &m);
-    bool cubeIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
+    bool boxIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
 };
 
 struct SceneObjects {
