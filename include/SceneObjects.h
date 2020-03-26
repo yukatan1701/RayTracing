@@ -93,7 +93,7 @@ struct Cube {
 };
 
 struct BoundingBox : public Cube {
-    static const int size = 4;
+    static const int size = 2;
     Cube grid[size][size][size];
     std::deque<const Triangle *> tgrid[size][size][size];
     BoundingBox() : Cube() {}
@@ -111,6 +111,7 @@ struct Model {
     Model(const std::string &filename, const float &scale,
           const vec3 &offset, const Material &m);
     bool boxIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
+    bool boxIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
 };
 
 struct SceneObjects {

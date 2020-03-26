@@ -6,7 +6,7 @@
 class Scene3 : public Scene {
 public:
     Scene3(const std::string &description = "description") : Scene(description) {}
-    int run(const Settings &s) const;
+    int run(const Settings &s);
 };
 
 #endif

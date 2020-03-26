@@ -3,6 +3,15 @@
 
 #include <string>
 #include <iostream>
+#include "Material.h"
+#include "SceneObjects.h"
+#include "glm/vec2.hpp"
+#include "glm/vec3.hpp"
+#include "glm/vec4.hpp"
+#include "glm/gtx/norm.hpp"
+#include "glm/gtx/normal.hpp"
+
+using namespace glm;
 
 struct Settings {
     std::string out;
@@ -16,10 +25,12 @@ struct Settings {
 class Scene {
 protected:
     std::string description;
+    vec3 reflect(const vec3 &i, const vec3 &n);
+    vec3 refract(const vec3 &I, const vec3 &N, const float etat, const float etai = 1.0f);
 public:
     Scene(const std::string &description) : description(description) {}
     std::string getDescription() const { return description; }
-    virtual int run(const Settings &s) const = 0;
+    virtual int run(const Settings &s) = 0;
 };
 
 #endif

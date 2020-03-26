@@ -5,6 +5,8 @@
 #include "Scene2.h"
 #include "Scene3.h"
 
+using namespace glm;
+
 Settings parseArgs(int argc, char **argv) {
     int paramCount = 4;
     if (argc == 1)

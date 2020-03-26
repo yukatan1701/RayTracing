@@ -148,9 +148,10 @@ bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
     }
     if (!(t_near <= t_far && t_far >= eps))
         return false;
+    dist = t_near;
     return true;
 }
-
+/*
 bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
     // orig point inside the cude
     if (orig.x >= minPoint.x && orig.x <= maxPoint.x &&
@@ -177,7 +178,7 @@ bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n)
 
             if (t_near > t_far)
                 return false;
-            if (t_far < 0.0f - std::numeric_limits<float>::epsilon())
+            if (t_far < std::numeric_limits<float>::epsilon())
                 return false;
         } else {
             if (orig[i] < minPoint[i] || orig[i] > maxPoint[i])
@@ -186,7 +187,6 @@ bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n)
     }
     if (!(t_near <= t_far && t_far >= eps))
         return false;
-        
     dist = t_near;
     vec3 hit = orig + dir * dist;
     vec3 c = (minPoint + maxPoint) * 0.5f;
@@ -198,6 +198,16 @@ bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n)
                        trunc(p.z / abs(d.z) * bias)));
     return true;
 }
+*/
+
+bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
+    for (auto f: faces) {
+        if (f.rayIntersect(orig, dir, dist, n)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 bool Cube::isInCube(const vec3 &v) const {
 
@@ -205,42 +215,48 @@ bool Cube::isInCube(const vec3 &v) const {
 
 void BoundingBox::init() {
     float lx = dx.second - dx.first, ly = dy.second - dy.first, lz = dz.second - dz.first;
+    std::cout << lx << " " << ly << " " << lz << std::endl;
+    std::cout << size << std::endl;
     float px = lx / float(size), py = ly / float(size), pz = lz / float(size);
+    std::cout << px << " " << py << " " << pz << std::endl;
     float x = dx.first, y = dy.first, z = dz.first;
     vec3 leftBottom, rightTop;
     for (int i = 0; i < size; i++) {
-        leftBottom.x = x, rightTop.x = x + px;
+        leftBottom.x = dx.first + px * i;
+        rightTop.x = dx.first + px * (i + 1);
         for (int j = 0; j < size; j++) {
-            leftBottom.y = y, rightTop.y = y + py;
+            leftBottom.y = dy.first + py * j;
+            rightTop.y = dy.first + py * (j + 1);
             for (int k = 0; k < size; k++) {
-                leftBottom.z = z, rightTop.z = z + pz;
+                leftBottom.z = dz.first + pz * k;
+                rightTop.z = dz.first + pz * (k + 1);
                 grid[i][j][k].loadFaces(leftBottom, rightTop);
-                z += pz;
             }
-            y += py;
         }
-        x += px;
     }
 }
 
 void BoundingBox::initTriangles(const std::deque<Triangle> &trs) {
-    float lx = (dx.second - dx.first) * size;
-    float ly = (dy.second - dy.first) * size;
-    float lz = (dz.second - dz.first) * size;
+    float lx = (dx.second - dx.first);
+    float ly = (dy.second - dy.first);
+    float lz = (dz.second - dz.first);
     for (auto &t: trs) {
         const vec3 &v0 = t.v0, &v1 = t.v1, &v2 = t.v2;
-        float fx0 = (v0.x - dx.first) / lx;
-        float fy0 = (v0.y - dy.first) / ly;
-        float fz0 = (v0.z - dz.first) / lz;
-        float fx1 = (v1.x - dx.first) / lx;
-        float fy1 = (v1.y - dy.first) / ly;
-        float fz1 = (v1.z - dz.first) / lz;
-        float fx2 = (v2.x - dx.first) / lx;
-        float fy2 = (v2.y - dy.first) / ly;
-        float fz2 = (v2.z - dz.first) / lz;
+        float fx0 = (v0.x - dx.first) / lx * size;
+        float fy0 = (v0.y - dy.first) / ly * size;
+        float fz0 = (v0.z - dz.first) / lz * size;
+        float fx1 = (v1.x - dx.first) / lx * size;
+        float fy1 = (v1.y - dy.first) / ly * size;
+        float fz1 = (v1.z - dz.first) / lz * size;
+        float fx2 = (v2.x - dx.first) / lx * size;
+        float fy2 = (v2.y - dy.first) / ly * size;
+        float fz2 = (v2.z - dz.first) / lz * size;
         int i0 = int(fx0), j0 = int(fy0), k0 = int(fz0);
         int i1 = int(fx1), j1 = int(fy1), k1 = int(fz1);
         int i2 = int(fx2), j2 = int(fy2), k2 = int(fz2);
+        //printf("([%.3lf][%.3lf][%.3lf])([%.3lf][%.3lf][%.3lf])([%.3lf][%.3lf][%.3lf])\n",
+        //    fx0, fy0, fz0, fx1, fy1, fz1, fx2, fy2, fz2);
+        //printf("([%d][%d][%d])([%d][%d][%d])([%d][%d][%d])\n", i0, j0, k0, i1, j1, k1, i2, j2, k2);
         //if (i > size-1 || j > size-1 || k > size-1)
         //    printf("%d, %d, %d\n", i, j, k);
         if (*tgrid[i0][j0][k0].begin() != &t)
@@ -249,6 +265,13 @@ void BoundingBox::initTriangles(const std::deque<Triangle> &trs) {
             tgrid[i1][j1][k1].push_front(&t);
         if (*tgrid[i2][j2][k2].begin() != &t)
             tgrid[i2][j2][k2].push_front(&t);
+    }
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+            for (int k = 0; k < size; k++) {
+                //printf("cell[%d][%d][%d]: %lu triangles.\n", i, j, k, tgrid[i][j][k].size());
+            }
+        }
     }
 }
 
@@ -301,4 +324,8 @@ Model::Model(const std::string &filename, const float &scale, const vec3 &offset
 
 bool Model::boxIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
     return box.rayIntersect(orig, dir, dist, n);
+}
+
+bool Model::boxIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
+    return box.rayIntersect(orig, dir, dist);
 }
