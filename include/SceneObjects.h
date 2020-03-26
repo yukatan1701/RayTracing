@@ -5,7 +5,8 @@
 #include "glm/vec3.hpp"
 #include "Material.h"
 #include <deque>
-#include <set>
+#include <array>
+#include <unordered_set>
 #include <iostream>
 #include <vector>
 
@@ -24,12 +25,20 @@ struct Sphere {
 
 struct Triangle {
     vec3 v0, v1, v2;
+    
     Material material;
 
     Triangle(const vec3 &vert0, const vec3 &vert1, const vec3 &vert2) :
-        v0(vert0), v1(vert1), v2(vert2) {} 
+        v0(vert0), v1(vert1), v2(vert2) {  } 
     Triangle(const vec3 &vert0, const vec3 &vert1, const vec3 &vert2, const Material &m) :
-        v0(vert0), v1(vert1), v2(vert2), material(m) {}
+        v0(vert0), v1(vert1), v2(vert2), material(m) {  }
+    
+    std::array<vec3, 3> getVerts() const {
+        std::array<vec3, 3> v;
+        v[0] = v0, v[1] = v1, v[2]= v2;
+        v[0] = v0, v[1] = v1, v[2]= v2;
+        return v;
+    }
 
     bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
 
@@ -93,23 +102,24 @@ struct Cube {
 };
 
 struct BoundingBox : public Cube {
-    static const int size = 2;
+    static const int size = 4;
     Cube grid[size][size][size];
-    std::deque<const Triangle *> tgrid[size][size][size];
+    std::unordered_set<const Triangle *> tgrid[size][size][size];
     BoundingBox() : Cube() {}
     BoundingBox(const vec3 &leftBottom, const vec3 &rightTop) :
         Cube(leftBottom, rightTop, Material()) {}
     void init();
-    void initTriangles(const std::deque<Triangle> &trs);
+    void initTriangles(const std::unordered_set<const Triangle *> &trs);
 };
 
 struct Model {
     BoundingBox box;
-    std::deque<Triangle> triangles;
+    std::unordered_set<const Triangle *> triangles;
     float scale;
     Material material;
     Model(const std::string &filename, const float &scale,
           const vec3 &offset, const Material &m);
+    ~Model();
     bool boxIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
     bool boxIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
 };
@@ -124,6 +134,7 @@ struct SceneObjects {
                  const std::deque<Light> &l, const std::deque<Model> &m,
                  const std::deque<Cube> &c) :
                  spheres(s), triangles(t), lights(l), models(m), cubes(c) {}
+                 
 };
 
 #endif

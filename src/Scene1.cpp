@@ -67,33 +67,21 @@ bool Scene1::sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObject
         }
     }
     min_dist = std::min(cubesDist, min_dist);
-    float modelsDist = std::numeric_limits<float>::max();
+    float modelsDist = 10000.0f;
     for (auto &model : sceneObjects.models) {
         float boxDist;
-        float modDist = 0.0f;
         if (model.boxIntersect(orig, dir, boxDist)) {
-            vec3 hitPoint = orig + dir * boxDist;
-            vec3 n(0.0f, 0.0f, 1.0f);
             int size = model.box.size;
             for (int i = 0; i < size; i++) {
                 for (int j = 0; j < size ; j++) {
                     for (int k = 0; k < size; k++) {
                         if (model.box.grid[i][j][k].rayIntersect(orig, dir, boxDist)) {
-                            //modelsDist = boxDist;
-                            //hit = orig + dir * boxDist;
-                            //N = n;
-                            //material = model.box.grid[i][j][k].material; 
-                            //material = sceneObjects.cubes[0].material;
                             float curDist = 0.0f;
-                            for (const Triangle *triangle : model.box.tgrid[i][j][k]) {  
-                                if (triangle->rayIntersect(orig, dir, curDist) && curDist < modelsDist &&
+                            for (const Triangle *triangle : model.box.tgrid[i][j][k]) {
+                                if (triangle != nullptr && triangle->rayIntersect(orig, dir, curDist) && curDist < modelsDist &&
                                     curDist < min_dist) {
-                                    //std::cout << curDist << std::endl;
-                                    modelsDist = curDist;
-                                    //std::cout << dir.x <<  " " << dir.y << dir.z << std::endl;
-                                    //    std::cout << curDist << std::endl;
+                                    modelsDist = 5.0f;
                                     hit = orig + dir * curDist;
-                                        
                                     N = triangleNormal(triangle->v0, triangle->v1, triangle->v2);
                                     material = triangle->material;
                                 }
@@ -102,16 +90,6 @@ bool Scene1::sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObject
                     }
                 }
             }
-            /*for (auto &triangle : model.triangles) {
-                float curDist;
-                if (triangle.rayIntersect(orig, dir, curDist) && curDist < modelsDist &&
-                    curDist < min_dist) {
-                    modelsDist = curDist;
-                    hit = orig + dir * curDist;
-                    N = triangleNormal(triangle.v0, triangle.v1, triangle.v2);
-                    material = triangle.material;
-                }
-            }*/
         }
     }
     min_dist = std::min(modelsDist, min_dist);
@@ -255,7 +233,7 @@ void Scene1::render(const Settings &settings) {
 }
 
 int Scene1::run(const Settings &settings) {
-    //omp_set_num_threads(settings.threads);
+    omp_set_num_threads(settings.threads);
     int n = -1;
     unsigned char *pixmap = stbi_load("../resources/map3.jpg", &envmap_width, &envmap_height, &n, 0);
     if (!pixmap || 3!=n) {

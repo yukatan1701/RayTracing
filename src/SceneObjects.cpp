@@ -236,43 +236,30 @@ void BoundingBox::init() {
     }
 }
 
-void BoundingBox::initTriangles(const std::deque<Triangle> &trs) {
+void BoundingBox::initTriangles(const std::unordered_set<const Triangle *> &trs) {
     float lx = (dx.second - dx.first);
     float ly = (dy.second - dy.first);
     float lz = (dz.second - dz.first);
     for (auto &t: trs) {
-        const vec3 &v0 = t.v0, &v1 = t.v1, &v2 = t.v2;
-        float fx0 = (v0.x - dx.first) / lx * size;
-        float fy0 = (v0.y - dy.first) / ly * size;
-        float fz0 = (v0.z - dz.first) / lz * size;
-        float fx1 = (v1.x - dx.first) / lx * size;
-        float fy1 = (v1.y - dy.first) / ly * size;
-        float fz1 = (v1.z - dz.first) / lz * size;
-        float fx2 = (v2.x - dx.first) / lx * size;
-        float fy2 = (v2.y - dy.first) / ly * size;
-        float fz2 = (v2.z - dz.first) / lz * size;
-        int i0 = int(fx0), j0 = int(fy0), k0 = int(fz0);
-        int i1 = int(fx1), j1 = int(fy1), k1 = int(fz1);
-        int i2 = int(fx2), j2 = int(fy2), k2 = int(fz2);
-        //printf("([%.3lf][%.3lf][%.3lf])([%.3lf][%.3lf][%.3lf])([%.3lf][%.3lf][%.3lf])\n",
-        //    fx0, fy0, fz0, fx1, fy1, fz1, fx2, fy2, fz2);
-        //printf("([%d][%d][%d])([%d][%d][%d])([%d][%d][%d])\n", i0, j0, k0, i1, j1, k1, i2, j2, k2);
-        //if (i > size-1 || j > size-1 || k > size-1)
-        //    printf("%d, %d, %d\n", i, j, k);
-        if (*tgrid[i0][j0][k0].begin() != &t)
-            tgrid[i0][j0][k0].push_front(&t);
-        if (*tgrid[i1][j1][k1].begin() != &t)
-            tgrid[i1][j1][k1].push_front(&t);
-        if (*tgrid[i2][j2][k2].begin() != &t)
-            tgrid[i2][j2][k2].push_front(&t);
+        for (const vec3 &v : t->getVerts()) {
+            float fx = (v.x - dx.first) * size / lx;
+            float fy = (v.y - dy.first) * size / ly;
+            float fz = (v.z - dz.first) * size / lz;
+            int i = int(fx), j = int(fy), k = int(fz);
+            tgrid[i][j][k].insert(t);
+        }
     }
+    
+    int total = 0;
     for (int i = 0; i < size; i++) {
         for (int j = 0; j < size; j++) {
             for (int k = 0; k < size; k++) {
-                //printf("cell[%d][%d][%d]: %lu triangles.\n", i, j, k, tgrid[i][j][k].size());
+                total += tgrid[i][j][k].size();
+                printf("cell[%d][%d][%d]: %lu triangles.\n", i, j, k, tgrid[i][j][k].size());
             }
         }
     }
+    printf("%d vs %lu\n", total, trs.size());
 }
 
 Model::Model(const std::string &filename, const float &scale, const vec3 &offset,
@@ -308,17 +295,16 @@ Model::Model(const std::string &filename, const float &scale, const vec3 &offset
     float eps = 0.0001f;
     vec3 veps(eps);
     box.loadFaces(vec3(min_x, min_y, min_z) - veps, vec3(max_x, max_y, max_z) + veps);
+    box.init();
     //boundingCube.printCube();
     while (faceNum--) {
         int ix, iy, iz;
         char ch = 0;
         file >> ch; // f
         file >> ix >> iy >> iz;
-        Triangle tr(vertices[ix-1], vertices[iy-1], vertices[iz-1], material);
-        triangles.push_front(tr);
+        triangles.insert(new Triangle(vertices[ix-1], vertices[iy-1], vertices[iz-1], material));
     } 
     file.close();
-    box.init();
     box.initTriangles(triangles);
 }
 
@@ -328,4 +314,10 @@ bool Model::boxIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n
 
 bool Model::boxIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
     return box.rayIntersect(orig, dir, dist);
+}
+
+Model::~Model() {
+    for (auto tr: triangles) {
+       // delete tr;
+    }
 }
