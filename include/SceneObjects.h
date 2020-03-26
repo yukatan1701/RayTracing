@@ -73,8 +73,6 @@ struct Light {
 
 struct Cube {
     vec3 minPoint, maxPoint;
-    std::vector<vec3> topVerts, bottomVerts;
-    std::deque<Quadrangle> faces;
     std::pair<float, float> dx, dy, dz;
     Material material;
     Cube() {}
@@ -82,27 +80,10 @@ struct Cube {
     void loadFaces(const vec3 &leftBottom, const vec3 &rightTop);
     bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
     bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
-    void printCube() const {
-        std::cout << "[";
-        for (auto vec : topVerts) {
-            printf("(%.3f, %.3f, %.3f) ", vec.x, vec.y, vec.z);
-        }
-        std::cout << "]\n[";
-        for (auto vec : bottomVerts) {
-            printf("(%.3f, %.3f, %.3f) ", vec.x, vec.y, vec.z);
-        }
-        std::cout << "]\n";
-    }
-    void printFaces() const {
-        for (auto face: faces) {
-            face.print();
-        }
-    }
-    bool isInCube(const vec3 &v) const;
 };
 
 struct BoundingBox : public Cube {
-    static const int size = 4;
+    static const int size = 5;
     Cube grid[size][size][size];
     std::unordered_set<const Triangle *> tgrid[size][size][size];
     BoundingBox() : Cube() {}

@@ -79,33 +79,11 @@ void Cube::loadFaces(const vec3 &minPoint, const vec3 &maxPoint) {
           maxZ = std::max(minP.z, maxP.z);
     Cube::minPoint = vec3(minX, minY, minZ);
     Cube::maxPoint = vec3(maxX, maxY, maxZ);
-    std::vector<vec3> &bv = bottomVerts;
-    std::vector<vec3> &tv = topVerts;
-    bv.push_back(vec3(minX, minY, minZ));
-    bv.push_back(vec3(minX, maxY, minZ));
-    bv.push_back(vec3(maxX, maxY, minZ));
-    bv.push_back(vec3(maxX, minY, minZ));
-    tv.push_back(vec3(minX, minY, maxZ));
-    tv.push_back(vec3(maxX, minY, maxZ));
-    tv.push_back(vec3(maxX, maxY, maxZ));
-    tv.push_back(vec3(minX, maxY, maxZ));
 
     dx = std::pair<float, float>(minX, maxX);
     dy = std::pair<float, float>(minY, maxY);
     dz = std::pair<float, float>(minZ, maxZ);
     //printf("[%.3f][%.3f][%.3f]\n", dx.first, dy.first, dz.first);
-
-    std::vector<vec3> f1 { bv[0], bv[3], tv[1], tv[0] };
-    std::vector<vec3> f2 { bv[3], bv[2], tv[2], tv[1] };
-    std::vector<vec3> f3 { bv[2], bv[1], tv[3], tv[2] };
-    std::vector<vec3> f4 { bv[1], bv[0], tv[0], tv[3] };
-    
-    faces.push_front(Quadrangle(bottomVerts, material));
-    faces.push_front(Quadrangle(topVerts, material));
-    faces.push_front(Quadrangle(f1, material));
-    faces.push_front(Quadrangle(f2, material));
-    faces.push_front(Quadrangle(f3, material));
-    faces.push_front(Quadrangle(f4, material));
 }
 
 Cube::Cube(const vec3 &leftBottom, const vec3 &rightTop,
@@ -151,7 +129,7 @@ bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
     dist = t_near;
     return true;
 }
-/*
+
 bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
     // orig point inside the cude
     if (orig.x >= minPoint.x && orig.x <= maxPoint.x &&
@@ -168,7 +146,6 @@ bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n)
         if (abs(dir[i]) >= eps) {
             t1 = (minPoint[i] - orig[i]) / dir[i];
             t2 = (maxPoint[i] - orig[i]) / dir[i];
-
             if (t1 > t2)
                 std::swap(t1, t2);
             if (t1 > t_near)
@@ -197,20 +174,6 @@ bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n)
                        trunc(p.y / abs(d.y) * bias),
                        trunc(p.z / abs(d.z) * bias)));
     return true;
-}
-*/
-
-bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
-    for (auto f: faces) {
-        if (f.rayIntersect(orig, dir, dist, n)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool Cube::isInCube(const vec3 &v) const {
-
 }
 
 void BoundingBox::init() {
@@ -249,17 +212,6 @@ void BoundingBox::initTriangles(const std::unordered_set<const Triangle *> &trs)
             tgrid[i][j][k].insert(t);
         }
     }
-    
-    int total = 0;
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++) {
-            for (int k = 0; k < size; k++) {
-                total += tgrid[i][j][k].size();
-                printf("cell[%d][%d][%d]: %lu triangles.\n", i, j, k, tgrid[i][j][k].size());
-            }
-        }
-    }
-    printf("%d vs %lu\n", total, trs.size());
 }
 
 Model::Model(const std::string &filename, const float &scale, const vec3 &offset,
