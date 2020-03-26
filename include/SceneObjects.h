@@ -25,7 +25,6 @@ struct Sphere {
 
 struct Triangle {
     vec3 v0, v1, v2;
-    
     Material material;
 
     Triangle(const vec3 &vert0, const vec3 &vert1, const vec3 &vert2) :

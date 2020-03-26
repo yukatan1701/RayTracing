@@ -100,7 +100,7 @@ bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
         }
     float t_near = std::numeric_limits<float>::min();
     float t_far = std::numeric_limits<float>::max();
-    float t1, t2;
+    float t1 = 1.0f, t2 = 1.0f;
     float eps = std::numeric_limits<float>::epsilon();
 
     for (int i = 0; i < 3; ++i) {
@@ -131,57 +131,31 @@ bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
 }
 
 bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const {
-    // orig point inside the cude
-    if (orig.x >= minPoint.x && orig.x <= maxPoint.x &&
-        orig.y >= minPoint.y && orig.y <= maxPoint.y &&
-        orig.z >= minPoint.z && orig.z <= maxPoint.z) {
-            return true;
-        }
-    float t_near = std::numeric_limits<float>::min();
-    float t_far = std::numeric_limits<float>::max();
-    float t1, t2;
-    float eps = std::numeric_limits<float>::epsilon();
-
-    for (int i = 0; i < 3; ++i) {
-        if (abs(dir[i]) >= eps) {
-            t1 = (minPoint[i] - orig[i]) / dir[i];
-            t2 = (maxPoint[i] - orig[i]) / dir[i];
-            if (t1 > t2)
-                std::swap(t1, t2);
-            if (t1 > t_near)
-                t_near = t1;
-            if (t2 < t_far)
-                t_far = t2;
-
-            if (t_near > t_far)
-                return false;
-            if (t_far < std::numeric_limits<float>::epsilon())
-                return false;
-        } else {
-            if (orig[i] < minPoint[i] || orig[i] > maxPoint[i])
-                return false;
-        }
-    }
-    if (!(t_near <= t_far && t_far >= eps))
+    if (!rayIntersect(orig, dir, dist)) {
+        n = vec3(0.0f);
         return false;
-    dist = t_near;
+    }
     vec3 hit = orig + dir * dist;
     vec3 c = (minPoint + maxPoint) * 0.5f;
     vec3 d = (minPoint - maxPoint) * 0.5f;
     vec3 p = hit - c;
     float bias = 1.000001f;
-    n = normalize(vec3(trunc(p.x / abs(d.x) * bias),
-                       trunc(p.y / abs(d.y) * bias),
-                       trunc(p.z / abs(d.z) * bias)));
+    float v1 = 0.0f, v2 = 0.0f, v3 = 0.0f;
+    float eps = std::numeric_limits<float>::epsilon();
+    v1 = p.x / abs(d.x) * bias;
+    v2 = p.y / abs(d.y) * bias;
+    v3 = p.z / abs(d.z) * bias;
+    int iv1(v1), iv2(v2), iv3(v3);
+    if (iv1 == 0 && iv2 == 0 && iv3 == 0) {
+        iv1 = 1;
+    }
+    n = normalize(vec3(iv1, iv2, iv3));
     return true;
 }
 
 void BoundingBox::init() {
     float lx = dx.second - dx.first, ly = dy.second - dy.first, lz = dz.second - dz.first;
-    std::cout << lx << " " << ly << " " << lz << std::endl;
-    std::cout << size << std::endl;
     float px = lx / float(size), py = ly / float(size), pz = lz / float(size);
-    std::cout << px << " " << py << " " << pz << std::endl;
     float x = dx.first, y = dy.first, z = dz.first;
     vec3 leftBottom, rightTop;
     for (int i = 0; i < size; i++) {

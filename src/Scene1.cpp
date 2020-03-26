@@ -3,7 +3,7 @@
 #include <vector>
 #include <limits>
 #include <cmath>
-//#include <omp.h>
+#include <omp.h>
 #include <set>
 #ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
@@ -19,8 +19,8 @@
 #include "SceneObjects.h"
 #include "Scene1.h"
 
-const int width = 4;
-const int height = 4;
+const int width = 512;
+const int height = 512;
 
 double bench_t_start, bench_t_end;
 
@@ -31,7 +31,6 @@ using namespace glm;
 
 bool Scene1::sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObjects &sceneObjects,
                     vec3 &hit, vec3 &N, Material &material) {
-    std::cout << "Begin scene" << std::endl;
     float min_dist = std::numeric_limits<float>::max();
     float spheresDist = std::numeric_limits<float>::max();
     for (auto &sphere: sceneObjects.spheres) {
@@ -68,8 +67,7 @@ bool Scene1::sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObject
         }
     }
     min_dist = std::min(cubesDist, min_dist);
-    std::cout << "Begin models" << std::endl;
-    float modelsDist = 10000.0f;
+    float modelsDist = std::numeric_limits<float>::max();
     for (auto &model : sceneObjects.models) {
         float boxDist;
         if (model.boxIntersect(orig, dir, boxDist)) {
@@ -94,7 +92,6 @@ bool Scene1::sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObject
             }
         }
     }
-    std::cout << "End models" << std::endl;
     min_dist = std::min(modelsDist, min_dist);
     float checkerboardDist = std::numeric_limits<float>::max();
     if (fabs(dir.y) > 0.001) {
@@ -109,44 +106,36 @@ bool Scene1::sceneIntersect(const vec3 &orig, const vec3 &dir, const SceneObject
         }
     }
     min_dist = std::min(checkerboardDist, min_dist);
-    std::cout << "End scene" << std::endl;
     return min_dist < 1000;
 }
 
 vec3 Scene1::traceRay(const vec3 &orig, const vec3 &dir, const SceneObjects &sceneObjects,
               size_t depth = 0) {
-    vec3 point, N;
+    vec3 point(0.0f), N(0.0f);
     Material material;
-    std::cout << "Begin trace" << std::endl;
     if (depth > 4 || !sceneIntersect(orig, dir, sceneObjects, point, N, material)) {
-        std::cout << "Begin inside" << std::endl;
         Sphere env(vec3(0.0f), 100, Material());
         float dist = 0;
         env.rayIntersect(orig, dir, dist);
-        vec3 p = orig + dir*dist;
-        long unsigned a = (atan2(p.z, p.x) / (2 * M_PI) + 0.5f) * envmap_width;
-        long unsigned b = acos(p.y / 100.0f) / M_PI * envmap_height;
-        std::cout << "End inside" << a+b*envmap_width << std::endl;
-        return envmap[a+b*envmap_width];
+        vec3 p = orig + dir * dist;
+        long unsigned a = (atan2(p.z, p.x) / (2.0f * M_PI) + 0.5f) * (float) envmap_width;
+        long unsigned b = acos(p.y / 100.0f) / M_PI * (float) envmap_height;
+        long unsigned place = a + b * envmap_width;
+        return envmap[place % envmap.size()];
     }
-    std::cout << "Begin outside" << std::endl;
-    std::cout << "Begin norma" << std::endl;
     vec3 reflectDir = normalize(reflect(dir, N));
     vec3 refractDir = normalize(refract(dir, N, material.refractive));
     vec3 reflectOrig = dot(reflectDir, N) < 0.0f ? point - N * 0.001f : point + N * 0.001f;
     vec3 refractOrig = dot(refractDir, N) < 0.0f ? point - N * 0.001f : point + N * 0.001f;
-    std::cout << "End norma" << std::endl;
-    std::cout << "Begin reflect" << std::endl;
     vec3 reflectColor = traceRay(reflectOrig, reflectDir, sceneObjects, depth + 1);
     vec3 refractColor = traceRay(refractOrig, refractDir, sceneObjects, depth + 1);
-    std::cout << "End norma" << std::endl;
     float diffuseLightIntensity = 0;
     float specularLightIntensity = 0;
     for (auto &light: sceneObjects.lights) {
         vec3 lightDir = normalize(light.position - point);
         float lightDistance = distance(light.position, point);
         vec3 shadowOrig = dot(lightDir, N) < 0 ? point - N * 0.001f : point + N * 0.001f;
-        vec3 shadowPt, shadowN;
+        vec3 shadowPt(0.0f), shadowN(0.0f);
         Material tmpmaterial;
         if (sceneIntersect(shadowOrig, lightDir, sceneObjects, shadowPt, shadowN, tmpmaterial) &&
             distance(shadowPt, shadowOrig) < lightDistance)
@@ -156,7 +145,6 @@ vec3 Scene1::traceRay(const vec3 &orig, const vec3 &dir, const SceneObjects &sce
         specularLightIntensity += powf(std::max(0.0f, dot(-reflect(-lightDir, N), dir)),
             material.specular) * light.intensity;
     }
-    std::cout << "End trace" << std::endl;
     return material.diffuse * diffuseLightIntensity * material.albedo[0] +
            vec3(1.0f, 1.0f, 1.0f) * specularLightIntensity * material.albedo[1] +
            reflectColor * material.albedo[2] + refractColor * material.albedo[3];
@@ -212,10 +200,10 @@ void Scene1::render(const Settings &settings) {
     SceneObjects sceneObjects(spheres, triangles, lights, models, cubes);
 
     const float fov = M_PI / 3.0f;
-    std::vector<vec3> frameBuffer(width * height);
+    std::vector<vec3> frameBuffer(width * height, vec3(0));
 
     vec3 camera(0, 5, 0);
-//#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
     for (size_t i = 0; i < height; ++i) {
         for (size_t j = 0; j < width; ++j) {
             float x =  (j + 0.5f) -  width / 2.0f;
@@ -246,7 +234,7 @@ void Scene1::render(const Settings &settings) {
 }
 
 int Scene1::run(const Settings &settings) {
-    //omp_set_num_threads(settings.threads);
+    omp_set_num_threads(settings.threads);
     int n = -1;
     unsigned char *pixmap = stbi_load("../resources/map3.jpg", &envmap_width, &envmap_height, &n, 0);
     if (!pixmap || 3!=n) {
@@ -266,12 +254,12 @@ int Scene1::run(const Settings &settings) {
     std::cout << "Output path: " << settings.out << std::endl;
     std::cout << "Scene number: " << settings.scene << std::endl;
     std::cout << "Threads: " << settings.threads << std::endl;
-    //std::cout << "Real threads: " << omp_get_max_threads() << std::endl;
+    std::cout << "Real threads: " << omp_get_max_threads() << std::endl;
     std::cout << "\nRendering image..." << std::endl;
-    //double time0 = omp_get_wtime();
+    double time0 = omp_get_wtime();
     render(settings);
     std::cout << "Ok." << std::endl;
-    //double time1 = omp_get_wtime();
-    //std::cout << "Done. Elapsed time: " << time1 - time0 << std::endl;
+    double time1 = omp_get_wtime();
+    std::cout << "Done. Elapsed time: " << time1 - time0 << std::endl;
     return 0;
 }
