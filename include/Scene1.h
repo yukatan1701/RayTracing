@@ -25,6 +25,7 @@ private:
     objset<Triangle *> loadTriangles();
     objset<Model *> loadModels();
     objset<Cube *> loadCubes();
+    objset<Island *> loadIslands();
     void deleteSceneObjects(SceneObjects &so);
     inline bool isNegative(const float &value) { return std::signbit(value); }
     void render(const Settings &settings);

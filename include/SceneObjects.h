@@ -99,9 +99,13 @@ struct Island {
     vec3 center;
     float majorAxis, minorAxis;
     vec3 normal = vec3(0.0f, 1.0f, 0.0f);
-    vec3 begin;
-    Island(const vec3 &center, const float &mjAx, const float &mnAx, const vec3 &begin) :
-        center(center), majorAxis(mjAx), minorAxis(mnAx), begin(begin) {}
+    const vec3 lightGreen = vec3(136, 204, 0) * 0.3f / 255.0f;
+    const vec3 darkGreen = vec3(102, 153, 0) * 0.3f / 255.0f;
+    Material material;
+    Island(const vec3 &center, const float &mjAx, const float &mnAx,
+           const Material &material) :
+        center(center), majorAxis(mjAx), minorAxis(mnAx),
+        material(material) {}
     bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist);
 };
 
@@ -111,12 +115,14 @@ struct SceneObjects {
     const objset<Light *> lights;
     const objset<Model *> models;
     const objset<Cube *> cubes;
+    const objset<Island *> islands;
     SceneObjects(const objset<Sphere *> &s,
                  const objset<Triangle *> &t,
                  const objset<Light *> &l,
                  const objset<Model *> &m,
-                 const objset<Cube *> &c) :
-                 spheres(s), triangles(t), lights(l), models(m), cubes(c) {}
+                 const objset<Cube *> &c,
+                 const objset<Island *> &i) :
+                 spheres(s), triangles(t), lights(l), models(m), cubes(c), islands(i) {}
     void spheresIntersect(const vec3 &orig, const vec3 &dir, vec3 &hit,
                           vec3 &N, Material &material, float &minDist) const;
     void trianglesIntersect(const vec3 &orig, const vec3 &dir, vec3 &hit, vec3 &N,
@@ -125,6 +131,8 @@ struct SceneObjects {
                          Material &material, float &minDist) const;
     void cubesIntersect(const vec3 &orig, const vec3 &dir, vec3 &hit, vec3 &N,
                         Material &material, float &minDist) const;
+    void islandsIntersect(const vec3 &orig, const vec3 &dir, vec3 &hit, vec3 &N,
+                          Material &material, float &minDist) const;
                  
 };
 

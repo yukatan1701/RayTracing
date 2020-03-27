@@ -216,8 +216,8 @@ Model::Model(const std::string &filename, const float &scale, const vec3 &offset
         max_z = std::max(max_z, v.z);
         vertices.push_back(v);
     }
-    std::cout << min_x << " " << min_y << " " << min_z << std::endl;
-    std::cout << max_x << " " << max_y << " " << max_z << std::endl;
+    //std::cout << min_x << " " << min_y << " " << min_z << std::endl;
+    //std::cout << max_x << " " << max_y << " " << max_z << std::endl;
     float eps = 0.0001f;
     vec3 veps(eps);
     box.load(vec3(min_x, min_y, min_z) - veps, vec3(max_x, max_y, max_z) + veps);
@@ -244,37 +244,26 @@ bool Model::boxIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
 
 
 Model::~Model() {
-    std::cout << triangles.size() << std::endl;
+    //std::cout << triangles.size() << std::endl;
     for (auto it = triangles.begin(); it != triangles.end(); it++) {
         delete *it;
     }
 }
 
 bool Island::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) {
-    /*float islandDist = std::numeric_limits<float>::max();
-    if (intersectRayPlane(orig, dir, vec3(0.0f, -4.0f, 0.0f), normal, islandDist) &&
-        islandDist < minDist) {
-        vec3 pt = orig + dir * islandDist;
-        float z = pt.z - zCenter;
-        if (pt.x > xBegin && pt.x < xEnd && pt.z > zBegin && pt.z < zEnd &&
-            pt.x * pt.x + z * z <= radius * radius) {
-            minDist = islandDist;
-            hit = pt;
-            N = waterNorm;
-            material = materials["island"];
-            material.diffuse = (int(hit.x + hit.z)) & 1 ? lightGreen : darkGreen;
-            float x = hit.x, fx = roundf(hit.x);
-            float z = ceilf(hit.x + hit.z) - fx - 0.5;
-            float rad = 0.15;
-            if ((x - fx) * (x - fx) + (hit.z - z) * (hit.z - z) < rad * rad) {
-                //std::cout << "o" << std::endl;
-                material.diffuse = (int(hit.x + hit.z)) & 1 ? darkGreen : lightGreen;
-            }
-        } else {
-            islandDist = std::numeric_limits<float>::max();
+    float oldDist = dist;
+    if (intersectRayPlane(orig, dir, vec3(0.0f, -4.0f, 0.0f), normal, dist)) {
+        vec3 pt = orig + dir * dist;
+        float xa = (pt.x - center.x) / majorAxis, zb = (pt.z - center.z) / minorAxis;
+
+        if (pt.x > center.x - majorAxis && pt.x < center.x + majorAxis &&
+            pt.z > center.z - minorAxis && pt.z < center.z + minorAxis &&
+            xa * xa + zb * zb <= 1.0f) {
+                return true; 
         }
     }
-    minDist = std::min(islandDist, minDist);*/
+    dist = oldDist;
+    return false;
 }
 
 void SceneObjects::spheresIntersect(const vec3 &orig, const vec3 &dir,
@@ -353,4 +342,26 @@ void SceneObjects::cubesIntersect(const vec3 &orig, const vec3 &dir,
         }
     }
     minDist = std::min(cubesDist, minDist);
+}
+
+void SceneObjects::islandsIntersect(const vec3 &orig, const vec3 &dir, vec3 &hit, vec3 &N,
+        Material &material, float &minDist) const {
+    float islandsDist = std::numeric_limits<float>::max();
+    for (auto &island : islands) {
+        float curDist = 0.0f;
+        if (island->rayIntersect(orig, dir, curDist) && curDist < minDist) {
+            islandsDist = curDist;
+            hit = orig + dir * curDist;
+            N = island->normal;
+            material = island->material;
+            material.diffuse = (int(hit.x + hit.z)) & 1 ? island->lightGreen : island->darkGreen;
+            float x = hit.x, fx = roundf(hit.x);
+            float z = ceilf(hit.x + hit.z) - fx - 0.5;
+            float rad = 0.15;
+            if ((x - fx) * (x - fx) + (hit.z - z) * (hit.z - z) < rad * rad) {
+                material.diffuse = (int(hit.x + hit.z)) & 1 ? island->darkGreen : island->lightGreen;
+            }
+        }
+    }
+    minDist = std::min(islandsDist, minDist);
 }

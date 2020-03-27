@@ -16,6 +16,15 @@
 
 using namespace glm;
 
+vec3 refract(const vec3 &I, const vec3 &N, const float etat, const float etai = 1.0f) {
+    float cosi = -std::max(-1.0f, std::min(1.0f, dot(I, N)));
+    if (cosi < 0)
+        return refract(I, -N, etai, etat);
+    float eta = etai / etat;
+    float k = 1 - eta * eta * (1 - cosi * cosi);
+    return k < 0 ? vec3(1, 0, 0) : I * eta + N * (eta * cosi - sqrtf(k));
+}
+
 bool Scene1::sceneIntersect(const vec3 &orig, const vec3 &dir,
                             const SceneObjects &sceneObjects,
                             vec3 &hit, vec3 &N, Material &material) {
@@ -24,7 +33,7 @@ bool Scene1::sceneIntersect(const vec3 &orig, const vec3 &dir,
     sceneObjects.trianglesIntersect(orig, dir, hit, N, material, minDist);
     sceneObjects.cubesIntersect(orig, dir, hit, N, material, minDist);
     sceneObjects.modelsIntersect(orig, dir, hit, N, material, minDist);
-    
+
     vec3 waterOrig(0.0f, -4.5f, 0.0f);
     vec3 waterNorm(0.0f, 1.0f, 0.0f);
     float waterDist = std::numeric_limits<float>::max();
@@ -36,38 +45,7 @@ bool Scene1::sceneIntersect(const vec3 &orig, const vec3 &dir,
     }
     minDist = std::min(waterDist, minDist);
 
-    float zBegin = -40, zEnd = -10;
-    float xBegin = -15, xEnd = 15;
-    
-    float zCenter = (zBegin + zEnd) / 2.0f;
-    float radius = 12;
-    vec3 lightGreen = vec3(136, 204, 0) * 0.3f / 255.0f;
-    vec3 darkGreen = vec3(102, 153, 0) * 0.3f / 255.0f;
-
-    float islandDist = std::numeric_limits<float>::max();
-    if (intersectRayPlane(orig, dir, vec3(0.0f, -4.0f, 0.0f), waterNorm, islandDist) &&
-        islandDist < minDist) {
-        vec3 pt = orig + dir * islandDist;
-        float z = pt.z - zCenter;
-        if (pt.x > xBegin && pt.x < xEnd && pt.z > zBegin && pt.z < zEnd &&
-            pt.x * pt.x + z * z <= radius * radius) {
-            minDist = islandDist;
-            hit = pt;
-            N = waterNorm;
-            material = materials["island"];
-            material.diffuse = (int(hit.x + hit.z)) & 1 ? lightGreen : darkGreen;
-            float x = hit.x, fx = roundf(hit.x);
-            float z = ceilf(hit.x + hit.z) - fx - 0.5;
-            float rad = 0.15;
-            if ((x - fx) * (x - fx) + (hit.z - z) * (hit.z - z) < rad * rad) {
-                //std::cout << "o" << std::endl;
-                material.diffuse = (int(hit.x + hit.z)) & 1 ? darkGreen : lightGreen;
-            }
-        } else {
-            islandDist = std::numeric_limits<float>::max();
-        }
-    }
-    minDist = std::min(islandDist, minDist);
+    sceneObjects.islandsIntersect(orig, dir, hit, N, material, minDist);
     return minDist < 700.0f;
 }
 
@@ -119,12 +97,9 @@ vec3 Scene1::traceRay(const vec3 &orig, const vec3 &dir,
 objset<Sphere *> Scene1::loadSpheres() {
     objset<Sphere *> spheres;
     spheres.insert(new Sphere(vec3( -6, -2.8, -22), 1, materials["silver"]));
-    spheres.insert(new Sphere(vec3( -4, -3.1, -21), 0.7, materials["mirror"]));
-    //spheres.insert(new Sphere(vec3( 0, 7, -25), 4, materials["glass"]));
-   // spheres.insert(new Sphere(vec3(-8.75, 6, -26.75), 1.75, materials["glass"])); //left
-   // spheres.insert(new Sphere(vec3(-5.75, 9, -28.75), 2.5, materials["mirror"])); //center
-   // spheres.insert(new Sphere(vec3(-2.75, 4, -30.75), 1, materials["red_rubber"])); //right
-    //spheres.insert(new Sphere(vec3( 0, -55, -20), 50, materials["red_rubber"]));
+    spheres.insert(new Sphere(vec3( -4, -3.1, -21), 0.7, materials["glass"]));
+    spheres.insert(new Sphere(vec3(-15.0f, -4.0f + 5, -50.0f), 5, materials["mirror"]));
+    spheres.insert(new Sphere(vec3(28.0f, -4.0f + 5, -75.0f), 5, materials["glass"]));
     return spheres;
 }
 
@@ -132,13 +107,13 @@ objset<Cube *> Scene1::loadCubes() {
     objset<Cube *> cubes; 
     Material wood = materials["wood"];
     /*  */
-    cubes.insert(new Cube(vec3(-6, -4, -28.5), vec3(-5, 3, -29), wood)); //center
-    cubes.insert(new Cube(vec3(-3, -4, -28.5), vec3(-2, 3, -29), wood)); //left
-    cubes.insert(new Cube(vec3(0, -4, -28.5), vec3(1, 3, -29), wood)); //right
-    cubes.insert(new Cube(vec3(3, -4, -28.5), vec3(4, 3, -29), wood)); 
-    cubes.insert(new Cube(vec3(3, -4, -28.5), vec3(4, 3, -29), wood)); 
-    cubes.insert(new Cube(vec3(-7, 1.5, -28.5), vec3(5, 2.5, -29), wood));
-    cubes.insert(new Cube(vec3(-7, -1.5, -28.5), vec3(5, -0.5, -29), wood));
+    cubes.insert(new Cube(vec3(-6, -4, -28), vec3(-5, 3, -29), wood)); //center
+    cubes.insert(new Cube(vec3(-3, -4, -28), vec3(-2, 3, -29), wood)); //left
+    cubes.insert(new Cube(vec3(0, -4, -28), vec3(1, 3, -29), wood)); //right
+    cubes.insert(new Cube(vec3(3, -4, -28), vec3(4, 3, -29), wood)); 
+    cubes.insert(new Cube(vec3(3, -4, -28), vec3(4, 3, -29), wood)); 
+    cubes.insert(new Cube(vec3(-7, 1.5, -28), vec3(5, 2.5, -29), wood));
+    cubes.insert(new Cube(vec3(-7, -1.5, -28), vec3(5, -0.5, -29), wood));
     /* */ 
     cubes.insert(new Cube(vec3(-8, -4, -20), vec3(-2, -3.75, -23), materials["wood"]));
     return cubes;
@@ -157,13 +132,6 @@ objset<Triangle *> Scene1::loadTriangles() {
     Material box = materials["wood"];
     triangles.insert(new Triangle(vec3(-8, -3.75, -20), vec3(-8, -3.75, -23), vec3(-8, -1, -23), box));
     triangles.insert(new Triangle(vec3(-8, -3.75, -23), vec3(-2, -3.75, -23), vec3(-8, -1, -23), box));
-   /* triangles.insert(new Triangle(vec3(8.0f, -4.f, -17.f), vec3(8, -4, -19), vec3(7, -1, -18), glass)); //right
-    triangles.insert(new Triangle(vec3(6.f, -4.f, -19.f), vec3(6, -4, -17), vec3(7, -1, -18), glass)); //left
-    triangles.insert(new Triangle(vec3(6, -4, -17), vec3(8, -4, -17), vec3(7, -1, -18), glass)); //front
-    triangles.insert(new Triangle(vec3(8, -4, -19), vec3(6, -4, -19), vec3(7, -1, -18), glass)); //back*/
-    //Quadrangle mirror(vec3(-10, -4, -15), vec3(-10, -4, -25), vec3(-10, 4, -25), vec3(-10, 4, -15), materials["mirror"]);
-    //objset<Triangle> mirTr = mirror.toTriangles();
-    //triangles.insert(triangles.begin(), mirTr.begin(), mirTr.end());
     return triangles;
 }
 
@@ -173,6 +141,15 @@ objset<Model *> Scene1::loadModels() {
     Model *bunny = new Model("../resources/bunny.obj", 45.0f, bias, materials["gold"]);
     models.insert(bunny);
     return models;
+}
+
+objset<Island *> Scene1::loadIslands() {
+    objset<Island *> islands;
+    islands.insert(new Island(vec3(0.0f, -4.0f, -25.0f), 12, 8, materials["island"]));
+    islands.insert(new Island(vec3(-15.0f, -4.0f, -50.0f), 12, 15, materials["island"]));
+    islands.insert(new Island(vec3(25.0f, -4.0f, -80.0f), 15, 15, materials["island"]));
+    islands.insert(new Island(vec3(-45.0f, -4.0f, -100.0f), 12, 10, materials["island"]));
+    return islands;
 }
 
 void Scene1::deleteSceneObjects(SceneObjects &so) {
@@ -186,6 +163,9 @@ void Scene1::deleteSceneObjects(SceneObjects &so) {
         delete model;
     for (auto cube : so.cubes)
         delete cube;
+    for (auto island: so.islands) {
+        delete island;
+    }
 }
 
 void Scene1::render(const Settings &settings) {
@@ -194,8 +174,9 @@ void Scene1::render(const Settings &settings) {
     objset<Light *> lights = loadLights();
     objset<Model *> models = loadModels();
     objset<Cube *> cubes = loadCubes();
+    objset<Island *> islands = loadIslands();
     
-    SceneObjects sceneObjects(spheres, triangles, lights, models, cubes);
+    SceneObjects sceneObjects(spheres, triangles, lights, models, cubes, islands);
 
     const float fov = M_PI / 3.0f;
     std::vector<vec3> imageGrid(width * height, vec3(0));
@@ -266,7 +247,6 @@ int Scene1::run(const Settings &settings) {
     std::cout << "\nRendering image..." << std::endl;
     double time0 = omp_get_wtime();
     render(settings);
-    std::cout << "Ok." << std::endl;
     double time1 = omp_get_wtime();
     std::cout << "Done. Elapsed time: " << time1 - time0 << std::endl;
     return 0;
