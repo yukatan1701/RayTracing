@@ -18,8 +18,6 @@ struct Settings {
 class Scene {
 protected:
     std::string description;
-    vec3 reflect(const vec3 &i, const vec3 &n);
-    vec3 refract(const vec3 &I, const vec3 &N, const float etat, const float etai = 1.0f);
 public:
     Scene(const std::string &description) : description(description) {}
     std::string getDescription() const { return description; }

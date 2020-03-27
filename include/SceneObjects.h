@@ -3,6 +3,7 @@
 
 #include "Material.h"
 #include "includes.h"
+#include "glm/gtx/intersect.hpp"
 #include <deque>
 #include <array>
 #include <iostream>
@@ -72,7 +73,7 @@ struct Cube {
 };
 
 struct BoundingBox : public Cube {
-    static const int size = 5;
+    static const int size = 4;
     Cube grid[size][size][size];
     objset<const Triangle *> tgrid[size][size][size];
     BoundingBox() : Cube() {}
@@ -81,20 +82,6 @@ struct BoundingBox : public Cube {
     void init();
     void initTriangles(const objset<const Triangle *> &trs);
 };
-/*
-class TrianglesSet : public objset<const Triangle *> {
-private:
-    objset<const Triangle *> triangles;
-public:    
-    TrianglesSet() {}
-
-    ~TrianglesSet() {
-        for (auto tr : triangles) {
-            if (tr != nullptr)
-                delete tr;
-        }
-    }
-};*/
 
 struct Model {
     BoundingBox box;
@@ -106,6 +93,16 @@ struct Model {
     ~Model();
     bool boxIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
     bool boxIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
+};
+
+struct Island {
+    vec3 center;
+    float majorAxis, minorAxis;
+    vec3 normal = vec3(0.0f, 1.0f, 0.0f);
+    vec3 begin;
+    Island(const vec3 &center, const float &mjAx, const float &mnAx, const vec3 &begin) :
+        center(center), majorAxis(mjAx), minorAxis(mnAx), begin(begin) {}
+    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist);
 };
 
 struct SceneObjects {

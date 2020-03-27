@@ -8,12 +8,12 @@
 class Scene1 : public Scene {
 private:
     const Materials materials;
-    const int width = 512;
-    const int height = 512;
+    const int width = 800;
+    const int height = 600;
     const int refractDepth = 4;
     const float fprec = 0.001f;
 
-    int backgrWidth, backgrHeight;
+    int backgroundWidth, backgroundHeight;
     std::vector<vec3> background;
     bool sceneIntersect(const vec3 &orig, const vec3 &dir,
                     const SceneObjects &sceneObjects,

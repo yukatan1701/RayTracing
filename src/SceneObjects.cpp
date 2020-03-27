@@ -250,6 +250,33 @@ Model::~Model() {
     }
 }
 
+bool Island::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) {
+    /*float islandDist = std::numeric_limits<float>::max();
+    if (intersectRayPlane(orig, dir, vec3(0.0f, -4.0f, 0.0f), normal, islandDist) &&
+        islandDist < minDist) {
+        vec3 pt = orig + dir * islandDist;
+        float z = pt.z - zCenter;
+        if (pt.x > xBegin && pt.x < xEnd && pt.z > zBegin && pt.z < zEnd &&
+            pt.x * pt.x + z * z <= radius * radius) {
+            minDist = islandDist;
+            hit = pt;
+            N = waterNorm;
+            material = materials["island"];
+            material.diffuse = (int(hit.x + hit.z)) & 1 ? lightGreen : darkGreen;
+            float x = hit.x, fx = roundf(hit.x);
+            float z = ceilf(hit.x + hit.z) - fx - 0.5;
+            float rad = 0.15;
+            if ((x - fx) * (x - fx) + (hit.z - z) * (hit.z - z) < rad * rad) {
+                //std::cout << "o" << std::endl;
+                material.diffuse = (int(hit.x + hit.z)) & 1 ? darkGreen : lightGreen;
+            }
+        } else {
+            islandDist = std::numeric_limits<float>::max();
+        }
+    }
+    minDist = std::min(islandDist, minDist);*/
+}
+
 void SceneObjects::spheresIntersect(const vec3 &orig, const vec3 &dir,
         vec3 &hit, vec3 &N, Material &material, float &minDist) const {
     float spheresDist = std::numeric_limits<float>::max();
@@ -293,6 +320,7 @@ void SceneObjects::modelsIntersect(const vec3 &orig, const vec3 &dir,
                         if (model->box.grid[i][j][k].rayIntersect(orig, dir, boxDist)) {
                             float curDist = 0.0f;
                             for (const Triangle *triangle : model->box.tgrid[i][j][k]) {
+                            //for (const Triangle *triangle : model->triangles) {    
                                 if (triangle->rayIntersect(orig, dir, curDist) && curDist < modelsDist &&
                                     curDist < minDist) {
                                     modelsDist = curDist;
