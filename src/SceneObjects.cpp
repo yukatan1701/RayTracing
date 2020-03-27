@@ -28,7 +28,7 @@ bool Triangle::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) cons
     vec3 edge2 = v2 - v0;
     vec3 pvec = cross(dir, edge2);
     float det = dot(edge1, pvec);
-    const float eps = 0.00001f;
+    const float eps = std::numeric_limits<float>::epsilon();
     if (det < eps)
         return false;
 
@@ -70,7 +70,7 @@ bool Quadrangle::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, ve
     return false;
 }
 
-void Cube::loadFaces(const vec3 &minPoint, const vec3 &maxPoint) {
+void Cube::load(const vec3 &minPoint, const vec3 &maxPoint) {
     const vec3 &minP = minPoint;
     const vec3 &maxP = maxPoint;
     float minX = std::min(minP.x, maxP.x), minY = std::min(minP.y, maxP.y),
@@ -88,7 +88,7 @@ void Cube::loadFaces(const vec3 &minPoint, const vec3 &maxPoint) {
 
 Cube::Cube(const vec3 &leftBottom, const vec3 &rightTop,
            const Material &m = Material()) : material(m){
-    loadFaces(leftBottom, rightTop);
+    load(leftBottom, rightTop);
 }
 
 bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
@@ -167,13 +167,13 @@ void BoundingBox::init() {
             for (int k = 0; k < size; k++) {
                 leftBottom.z = dz.first + pz * k;
                 rightTop.z = dz.first + pz * (k + 1);
-                grid[i][j][k].loadFaces(leftBottom, rightTop);
+                grid[i][j][k].load(leftBottom, rightTop);
             }
         }
     }
 }
 
-void BoundingBox::initTriangles(const std::unordered_set<const Triangle *> &trs) {
+void BoundingBox::initTriangles(const objset<const Triangle *> &trs) {
     float lx = (dx.second - dx.first);
     float ly = (dy.second - dy.first);
     float lz = (dz.second - dz.first);
@@ -220,7 +220,7 @@ Model::Model(const std::string &filename, const float &scale, const vec3 &offset
     std::cout << max_x << " " << max_y << " " << max_z << std::endl;
     float eps = 0.0001f;
     vec3 veps(eps);
-    box.loadFaces(vec3(min_x, min_y, min_z) - veps, vec3(max_x, max_y, max_z) + veps);
+    box.load(vec3(min_x, min_y, min_z) - veps, vec3(max_x, max_y, max_z) + veps);
     box.init();
     //boundingCube.printCube();
     while (faceNum--) {
@@ -242,8 +242,87 @@ bool Model::boxIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
     return box.rayIntersect(orig, dir, dist);
 }
 
+
 Model::~Model() {
-    for (auto tr: triangles) {
-       // delete tr;
+    std::cout << triangles.size() << std::endl;
+    for (auto it = triangles.begin(); it != triangles.end(); it++) {
+        delete *it;
     }
+}
+
+void SceneObjects::spheresIntersect(const vec3 &orig, const vec3 &dir,
+        vec3 &hit, vec3 &N, Material &material, float &minDist) const {
+    float spheresDist = std::numeric_limits<float>::max();
+    for (auto &sphere: spheres) {
+        float curDist = 0.0f;
+        if (sphere->rayIntersect(orig, dir, curDist) && curDist < spheresDist && curDist < minDist) {
+            spheresDist = curDist;
+            hit = orig + dir * curDist;
+            N = normalize(hit - sphere->center);
+            material = sphere->material;
+        }
+    }
+    minDist = std::min(spheresDist, minDist);
+}
+
+void SceneObjects::trianglesIntersect(const vec3 &orig, const vec3 &dir,
+        vec3 &hit, vec3 &N, Material &material, float &minDist) const {
+    float trianglesDist = std::numeric_limits<float>::max();
+    for (auto &triangle : triangles) {
+        float curDist = 0.0f;
+        if (triangle->rayIntersect(orig, dir, curDist) && curDist < trianglesDist && curDist < minDist) {
+            trianglesDist = curDist;
+            hit = orig + dir * curDist;
+            N = triangleNormal(triangle->v0, triangle->v1, triangle->v2);
+            material = triangle->material;
+        }
+    }
+    minDist = std::min(trianglesDist, minDist);
+}
+
+void SceneObjects::modelsIntersect(const vec3 &orig, const vec3 &dir,
+        vec3 &hit, vec3 &N, Material &material, float &minDist) const {
+    float modelsDist = std::numeric_limits<float>::max();
+    for (auto &model : models) {
+        float boxDist = 0.0f;
+        if (model->boxIntersect(orig, dir, boxDist)) {
+            int size = model->box.size;
+            for (int i = 0; i < size; i++) {
+                for (int j = 0; j < size ; j++) {
+                    for (int k = 0; k < size; k++) {
+                        if (model->box.grid[i][j][k].rayIntersect(orig, dir, boxDist)) {
+                            float curDist = 0.0f;
+                            for (const Triangle *triangle : model->box.tgrid[i][j][k]) {
+                                if (triangle->rayIntersect(orig, dir, curDist) && curDist < modelsDist &&
+                                    curDist < minDist) {
+                                    modelsDist = curDist;
+                                    hit = orig + dir * curDist;
+                                    N = triangleNormal(triangle->v0, triangle->v1, triangle->v2);
+                                    material = triangle->material;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    minDist = std::min(modelsDist, minDist);
+}
+
+void SceneObjects::cubesIntersect(const vec3 &orig, const vec3 &dir,
+        vec3 &hit, vec3 &N, Material &material, float &minDist) const {
+    float cubesDist = std::numeric_limits<float>::max();
+    for (auto &cube : cubes) {
+        float curDist = 0.0f;
+        vec3 normal(0.0f);
+        if (cube->rayIntersect(orig, dir, curDist, normal) && curDist < cubesDist &&
+            curDist < minDist) {
+            cubesDist = curDist;
+            hit = orig + dir * curDist;
+            N = normal;
+            material = cube->material;
+        }
+    }
+    minDist = std::min(cubesDist, minDist);
 }

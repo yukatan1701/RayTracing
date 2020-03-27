@@ -5,13 +5,6 @@
 #include <iostream>
 #include "Material.h"
 #include "SceneObjects.h"
-#include "glm/vec2.hpp"
-#include "glm/vec3.hpp"
-#include "glm/vec4.hpp"
-#include "glm/gtx/norm.hpp"
-#include "glm/gtx/normal.hpp"
-
-using namespace glm;
 
 struct Settings {
     std::string out;

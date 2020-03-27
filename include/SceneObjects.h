@@ -1,16 +1,12 @@
 #ifndef __SCENE_OBJECTS__
 #define __SCENE_OBJECTS__
 
-#include "glm/vec2.hpp"
-#include "glm/vec3.hpp"
 #include "Material.h"
+#include "includes.h"
 #include <deque>
 #include <array>
-#include <unordered_set>
 #include <iostream>
 #include <vector>
-
-using namespace glm;
 
 struct Sphere {
     vec3 center;
@@ -56,12 +52,6 @@ struct Quadrangle {
 
     std::deque<Triangle> toTriangles() const;
     bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
-    void print() const {
-        printf("(%.3f, %.3f, %.3f) ", v0.x, v0.y, v0.z);
-        printf("(%.3f, %.3f, %.3f) ", v1.x, v1.y, v1.z);
-        printf("(%.3f, %.3f, %.3f) ", v2.x, v2.y, v2.z);
-        printf("(%.3f, %.3f, %.3f)\n", v3.x, v3.y, v3.z);
-    }
 };
 
 struct Light {
@@ -76,7 +66,7 @@ struct Cube {
     Material material;
     Cube() {}
     Cube(const vec3 &leftBottom, const vec3 &rightTop, const Material &m);
-    void loadFaces(const vec3 &leftBottom, const vec3 &rightTop);
+    void load(const vec3 &leftBottom, const vec3 &rightTop);
     bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
     bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
 };
@@ -84,17 +74,31 @@ struct Cube {
 struct BoundingBox : public Cube {
     static const int size = 5;
     Cube grid[size][size][size];
-    std::unordered_set<const Triangle *> tgrid[size][size][size];
+    objset<const Triangle *> tgrid[size][size][size];
     BoundingBox() : Cube() {}
     BoundingBox(const vec3 &leftBottom, const vec3 &rightTop) :
         Cube(leftBottom, rightTop, Material()) {}
     void init();
-    void initTriangles(const std::unordered_set<const Triangle *> &trs);
+    void initTriangles(const objset<const Triangle *> &trs);
 };
+/*
+class TrianglesSet : public objset<const Triangle *> {
+private:
+    objset<const Triangle *> triangles;
+public:    
+    TrianglesSet() {}
+
+    ~TrianglesSet() {
+        for (auto tr : triangles) {
+            if (tr != nullptr)
+                delete tr;
+        }
+    }
+};*/
 
 struct Model {
     BoundingBox box;
-    std::unordered_set<const Triangle *> triangles;
+    objset<const Triangle *> triangles;
     float scale;
     Material material;
     Model(const std::string &filename, const float &scale,
@@ -105,15 +109,25 @@ struct Model {
 };
 
 struct SceneObjects {
-    const std::deque<Sphere> &spheres;
-    const std::deque<Triangle> &triangles;
-    const std::deque<Light> &lights;
-    const std::deque<Model> &models;
-    const std::deque<Cube> &cubes;
-    SceneObjects(const std::deque<Sphere> &s, const std::deque<Triangle> &t,
-                 const std::deque<Light> &l, const std::deque<Model> &m,
-                 const std::deque<Cube> &c) :
+    const objset<Sphere *> spheres;
+    const objset<Triangle *> triangles;
+    const objset<Light *> lights;
+    const objset<Model *> models;
+    const objset<Cube *> cubes;
+    SceneObjects(const objset<Sphere *> &s,
+                 const objset<Triangle *> &t,
+                 const objset<Light *> &l,
+                 const objset<Model *> &m,
+                 const objset<Cube *> &c) :
                  spheres(s), triangles(t), lights(l), models(m), cubes(c) {}
+    void spheresIntersect(const vec3 &orig, const vec3 &dir, vec3 &hit,
+                          vec3 &N, Material &material, float &minDist) const;
+    void trianglesIntersect(const vec3 &orig, const vec3 &dir, vec3 &hit, vec3 &N,
+                            Material &material, float &minDist) const;
+    void modelsIntersect(const vec3 &orig, const vec3 &dir, vec3 &hit, vec3 &N,
+                         Material &material, float &minDist) const;
+    void cubesIntersect(const vec3 &orig, const vec3 &dir, vec3 &hit, vec3 &N,
+                        Material &material, float &minDist) const;
                  
 };
 
