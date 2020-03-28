@@ -13,8 +13,8 @@ private:
     const int refractDepth = 4;
     const float fprec = 0.001f;
 
-    int backgroundWidth, backgroundHeight;
-    std::vector<vec3> background;
+    int backgroundWidth, backgroundHeight, waterWidth, waterHeight;
+    std::vector<vec3> background, water;
     bool sceneIntersect(const vec3 &orig, const vec3 &dir,
                     const SceneObjects &sceneObjects,
                     vec3 &hit, vec3 &N, Material &material);

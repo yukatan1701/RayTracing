@@ -25,6 +25,10 @@ vec3 refract(const vec3 &I, const vec3 &N, const float etat, const float etai = 
     return k < 0 ? vec3(1, 0, 0) : I * eta + N * (eta * cosi - sqrtf(k));
 }
 
+inline int positiveModulo(int i, int n) {
+    return (i % n + n) % n;
+}
+
 bool Scene1::sceneIntersect(const vec3 &orig, const vec3 &dir,
                             const SceneObjects &sceneObjects,
                             vec3 &hit, vec3 &N, Material &material) {
@@ -42,6 +46,13 @@ bool Scene1::sceneIntersect(const vec3 &orig, const vec3 &dir,
         hit = orig + dir * waterDist;
         N = waterNorm;
         material = materials["water_bottom"];
+        float scale = 10.0f; // textures per 1 x 1
+        float x = hit.x / scale, z = hit.z / scale;
+        float xx = x - floor(x), zz = z - floor(z);
+       // float x = (hit.x - floor(hit.x)), z = (hit.z - floor(hit.z));
+        unsigned xpos = xx * waterWidth, zpos = zz * waterHeight;
+        material.diffuse = (water[zpos * waterWidth + xpos] * 0.3f + material.diffuse) / 2.0f;
+        //printf("(%.3f, %.3f, %.3f)", material.diffuse.x, material.diffuse.y, material.diffuse.z);
     }
     minDist = std::min(waterDist, minDist);
 
@@ -57,9 +68,8 @@ vec3 Scene1::traceRay(const vec3 &orig, const vec3 &dir,
         Sphere env(vec3(0.0f), 100, Material());
         float dist(0.0f);
         env.rayIntersect(orig, dir, dist);
-        vec3 p = orig + dir * dist;
-        unsigned a = (atan2(p.z, p.x) / (2.0f * M_PI) + 0.5f) * (float) backgroundWidth;
-        unsigned b = acos(p.y / 100.0f) / M_PI * (float) backgroundHeight;
+        unsigned a = std::max(0, std::min(backgroundWidth -1, int((atan2(dir.z, dir.x) / (2*M_PI) + .5) * backgroundWidth)));
+        unsigned b = std::max(0, std::min(backgroundHeight-1, int(acos(dir.y)/M_PI * backgroundHeight)));
         unsigned place = a + b * backgroundWidth + 200;
         return background[place % background.size()];
     }
@@ -122,8 +132,8 @@ objset<Cube *> Scene1::loadCubes() {
 objset<Light *> Scene1::loadLights() {
     objset<Light *> lights;
     lights.insert(new Light(vec3(-20, 20,  20), 1.5));
-    lights.insert(new Light(vec3( 30, 50, -25), 2.0)); //bad
-    lights.insert(new Light(vec3( 30, 20,  30), 1.7)); // ok
+    lights.insert(new Light(vec3( 30, 50, -25), 2.0));
+    lights.insert(new Light(vec3( 30, 20,  30), 1.7));
     return lights;
 }
 
@@ -217,7 +227,6 @@ void Scene1::render(const Settings &settings) {
             image.set_pixel(x, y, color);
         }
     }
-
     image.save_image(settings.out);
 }
 
@@ -239,6 +248,21 @@ int Scene1::run(const Settings &settings) {
         }
     }
     stbi_image_free(pixmap);
+    n = -1;
+    unsigned char *water_image = stbi_load("../resources/water.jpg", &waterWidth, &waterHeight, &n, 0);
+    if (!water_image || n != 3) {
+        std::cout << "Error: can not load water texture: " << stbi_failure_reason() <<std::endl;
+        return -1;
+    }
+    water = std::vector<vec3>(waterWidth * waterHeight);
+    for (int j = waterHeight - 1; j >= 0; j--) {
+        for (int i = 0; i < waterWidth; i++) {
+            unsigned pos = i + j * waterWidth;
+            vec3 colorRGB(water_image[pos * 3], water_image[pos * 3 + 1], water_image[pos * 3 + 2]);
+            water[pos] = colorRGB * 1.0f / 255.0f;
+        }
+    }
+    stbi_image_free(water_image);
     std::cout << "[Current settings]" << std::endl;
     std::cout << "Output path: " << settings.out << std::endl;
     std::cout << "Scene number: " << settings.scene << std::endl;
