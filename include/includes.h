@@ -7,6 +7,7 @@
 #include "glm/vec4.hpp"
 #include "glm/gtx/norm.hpp"
 #include "glm/gtx/normal.hpp"
+#include "glm/gtx/transform.hpp"
 
 template<typename T>
 using objset = std::unordered_set<T>;

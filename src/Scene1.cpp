@@ -17,16 +17,13 @@
 using namespace glm;
 
 vec3 refract(const vec3 &I, const vec3 &N, const float etat, const float etai = 1.0f) {
+    vec3 nI = normalize(I);
     float cosi = -std::max(-1.0f, std::min(1.0f, dot(I, N)));
     if (cosi < 0)
         return refract(I, -N, etai, etat);
     float eta = etai / etat;
     float k = 1 - eta * eta * (1 - cosi * cosi);
     return k < 0 ? vec3(1, 0, 0) : I * eta + N * (eta * cosi - sqrtf(k));
-}
-
-inline int positiveModulo(int i, int n) {
-    return (i % n + n) % n;
 }
 
 bool Scene1::sceneIntersect(const vec3 &orig, const vec3 &dir,
@@ -109,7 +106,7 @@ objset<Sphere *> Scene1::loadSpheres() {
     spheres.insert(new Sphere(vec3( -6, -2.8, -22), 1, materials["silver"]));
     spheres.insert(new Sphere(vec3( -4, -3.1, -21), 0.7, materials["glass"]));
     spheres.insert(new Sphere(vec3(-15.0f, -4.0f + 5, -50.0f), 5, materials["mirror"]));
-    spheres.insert(new Sphere(vec3(28.0f, -4.0f + 5, -75.0f), 5, materials["glass"]));
+    spheres.insert(new Sphere(vec3(25.0f, -4.0f + 4, -50.0f), 4, materials["glass"]));
     return spheres;
 }
 
@@ -134,6 +131,7 @@ objset<Light *> Scene1::loadLights() {
     lights.insert(new Light(vec3(-20, 20,  20), 1.5));
     lights.insert(new Light(vec3( 30, 50, -25), 2.0));
     lights.insert(new Light(vec3( 30, 20,  30), 1.7));
+    //lights.insert(new Light(vec3( -4, 1, -21), 1.7));
     return lights;
 }
 
@@ -141,7 +139,9 @@ objset<Triangle *> Scene1::loadTriangles() {
     objset<Triangle *> triangles;
     Material box = materials["wood"];
     triangles.insert(new Triangle(vec3(-8, -3.75, -20), vec3(-8, -3.75, -23), vec3(-8, -1, -23), box));
+    triangles.insert(new Triangle(vec3(-8, -3.75, -20), vec3(-8, -1, -23), vec3(-8, -3.75, -23), box)); // back
     triangles.insert(new Triangle(vec3(-8, -3.75, -23), vec3(-2, -3.75, -23), vec3(-8, -1, -23), box));
+    triangles.insert(new Triangle(vec3(-8, -3.75, -23), vec3(-8, -1, -23), vec3(-2, -3.75, -23), box)); //back
     return triangles;
 }
 
@@ -157,8 +157,8 @@ objset<Island *> Scene1::loadIslands() {
     objset<Island *> islands;
     islands.insert(new Island(vec3(0.0f, -4.0f, -25.0f), 12, 8, materials["island"]));
     islands.insert(new Island(vec3(-15.0f, -4.0f, -50.0f), 12, 15, materials["island"]));
-    islands.insert(new Island(vec3(25.0f, -4.0f, -80.0f), 15, 15, materials["island"]));
-    islands.insert(new Island(vec3(-45.0f, -4.0f, -100.0f), 12, 10, materials["island"]));
+    islands.insert(new Island(vec3(25.0f, -4.0f, -50.0f), 10, 12, materials["island"]));
+    islands.insert(new Island(vec3(15.0f, -4.0f, -100.0f), 15, 12, materials["island"]));
     return islands;
 }
 
@@ -191,14 +191,20 @@ void Scene1::render(const Settings &settings) {
     const float fov = M_PI / 3.0f;
     std::vector<vec3> imageGrid(width * height, vec3(0));
 
-    vec3 camera(0, 5, 0);
+	float angleX = 15 * M_PI / float(180);
+    float angleY = 15 * M_PI / float(180);
+	//angle = 0;
+	
+    mat3 rotateX = rotate(mat4(1), -angleX, vec3(1, 0, 0));
+    mat3 rotateY = rotate(mat4(1), -angleY, vec3(0, 1, 0));
+    vec3 camera(-7.5, 8, -5); //(-7.5, 8, - ...)
 #pragma omp parallel for schedule(dynamic)
     for (size_t i = 0; i < height; ++i) {
         for (size_t j = 0; j < width; ++j) {
             float x =  (j + 0.5f) -  width / 2.0f;
             float y = -(i + 0.5f) + height / 2.0f;
             float z = -height / (2.0f * tan(fov / 2.0f));
-            vec3 dir = normalize(vec3(x, y, z));
+            vec3 dir = normalize(rotateY * rotateX * vec3(x, y, z) + camera);
             vec3 result = traceRay(camera, dir, sceneObjects);
             imageGrid[i * width + j] = result;
         }
@@ -217,11 +223,6 @@ void Scene1::render(const Settings &settings) {
     bitmap_image image(width, height);
     for (size_t y = 0; y < image.height(); ++y) {
         for (size_t x = 0; x < image.width(); ++x) {
-            vec3 &c = imageGrid[y * width + x];
-            float max = std::max(c[0], std::max(c[1], c[2]));
-            if (max > 1) {
-                c *= 1.0 / max;
-            }
             vec3 colorRGB = getRGBColor(imageGrid[y * width + x]);
             rgb_t color(colorRGB.x, colorRGB.y, colorRGB.z);
             image.set_pixel(x, y, color);

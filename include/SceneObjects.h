@@ -73,7 +73,7 @@ struct Cube {
 };
 
 struct BoundingBox : public Cube {
-    static const int size = 4;
+    static const int size = 7;
     Cube grid[size][size][size];
     objset<const Triangle *> tgrid[size][size][size];
     BoundingBox() : Cube() {}

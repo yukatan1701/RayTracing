@@ -147,7 +147,19 @@ bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n)
     v3 = p.z / abs(d.z) * bias;
     int iv1(v1), iv2(v2), iv3(v3);
     if (iv1 == 0 && iv2 == 0 && iv3 == 0) {
-        iv1 = 1;
+        auto max = [](float a, float b, float c){
+            float mx = 0;
+            mx = a > b ? a : b;
+            mx = mx > c ? mx : c;
+            return mx;
+        };
+        if (abs(v1 - max(v1, v2, v3)) < eps) {
+            iv1 = 1;
+        } else if (abs(v2 - max(v1, v2, v3)) < eps) {
+            iv2 = 1;
+        } else {
+            iv3 = 1;
+        }
     }
     n = normalize(vec3(iv1, iv2, iv3));
     return true;
