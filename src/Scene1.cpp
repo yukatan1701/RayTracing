@@ -67,7 +67,7 @@ vec3 Scene1::traceRay(const vec3 &orig, const vec3 &dir,
         env.rayIntersect(orig, dir, dist);
         unsigned a = std::max(0, std::min(backgroundWidth -1, int((atan2(dir.z, dir.x) / (2*M_PI) + .5) * backgroundWidth)));
         unsigned b = std::max(0, std::min(backgroundHeight-1, int(acos(dir.y)/M_PI * backgroundHeight)));
-        unsigned place = a + b * backgroundWidth + 200;
+        unsigned place = a + (unsigned(b - 100) % backgroundHeight) * backgroundWidth;
         return background[place % background.size()];
     }
     
