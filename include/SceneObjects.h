@@ -68,8 +68,9 @@ struct Cube {
     Cube() {}
     Cube(const vec3 &leftBottom, const vec3 &rightTop, const Material &m);
     void load(const vec3 &leftBottom, const vec3 &rightTop);
-    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
-    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
+    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &nearDist) const;
+    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &nearDist, vec3 &n) const;
+    bool rayIntersect(const vec3 &orig, const vec3 &dir, float &nearDist, float &farDist) const;
 };
 
 struct BoundingBox : public Cube {
@@ -81,6 +82,8 @@ struct BoundingBox : public Cube {
         Cube(leftBottom, rightTop, Material()) {}
     void init();
     void initTriangles(const objset<const Triangle *> &trs);
+    std::array<std::pair<int, int>, 3> getCoordinates(const vec3 &orig,
+        const vec3 &dir, const float &nearDist, const float &farDist) const; 
 };
 
 struct Model {
@@ -92,7 +95,7 @@ struct Model {
           const vec3 &offset, const Material &m);
     ~Model();
     bool boxIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n) const;
-    bool boxIntersect(const vec3 &orig, const vec3 &dir, float &dist) const;
+    bool boxIntersect(const vec3 &orig, const vec3 &dir, float &nearDist, float &farDist) const;
 };
 
 struct Island {
@@ -109,6 +112,18 @@ struct Island {
     bool rayIntersect(const vec3 &orig, const vec3 &dir, float &dist);
 };
 
+struct Sky {
+    std::vector<vec3> texture;
+    int width, height;
+    Sky(const std::string &filename);
+    vec3 getColorAt(const vec3 &dir);
+};
+
+struct Lightning {
+    float diffuse = 0;
+    float specular = 0;
+};
+
 struct SceneObjects {
     const objset<Sphere *> spheres;
     const objset<Triangle *> triangles;
@@ -116,13 +131,15 @@ struct SceneObjects {
     const objset<Model *> models;
     const objset<Cube *> cubes;
     const objset<Island *> islands;
+    Sky *sky;
     SceneObjects(const objset<Sphere *> &s,
                  const objset<Triangle *> &t,
                  const objset<Light *> &l,
                  const objset<Model *> &m,
                  const objset<Cube *> &c,
                  const objset<Island *> &i) :
-                 spheres(s), triangles(t), lights(l), models(m), cubes(c), islands(i) {}
+                 spheres(s), triangles(t), lights(l), models(m), cubes(c), islands(i) { loadSky(); }
+    void loadSky() { sky = new Sky("../resources/map2.jpg"); }
     void spheresIntersect(const vec3 &orig, const vec3 &dir, vec3 &hit,
                           vec3 &N, Material &material, float &minDist) const;
     void trianglesIntersect(const vec3 &orig, const vec3 &dir, vec3 &hit, vec3 &N,

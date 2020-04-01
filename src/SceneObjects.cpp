@@ -1,5 +1,7 @@
 #include "SceneObjects.h"
 #include "glm/gtx/normal.hpp"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -92,6 +94,11 @@ Cube::Cube(const vec3 &leftBottom, const vec3 &rightTop,
 }
 
 bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
+    float farDist(0);
+    return rayIntersect(orig, dir, dist, farDist);
+}
+
+bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &nearDist, float &farDist) const {
     // orig point inside the cude
     if (orig.x >= minPoint.x && orig.x <= maxPoint.x &&
         orig.y >= minPoint.y && orig.y <= maxPoint.y &&
@@ -126,7 +133,8 @@ bool Cube::rayIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
     }
     if (!(t_near <= t_far && t_far >= eps))
         return false;
-    dist = t_near;
+    nearDist = t_near;
+    farDist = t_far;
     return true;
 }
 
@@ -250,8 +258,8 @@ bool Model::boxIntersect(const vec3 &orig, const vec3 &dir, float &dist, vec3 &n
     return box.rayIntersect(orig, dir, dist, n);
 }
 
-bool Model::boxIntersect(const vec3 &orig, const vec3 &dir, float &dist) const {
-    return box.rayIntersect(orig, dir, dist);
+bool Model::boxIntersect(const vec3 &orig, const vec3 &dir, float &nearDist, float &farDist) const {
+    return box.rayIntersect(orig, dir, nearDist, farDist);
 }
 
 
@@ -308,17 +316,49 @@ void SceneObjects::trianglesIntersect(const vec3 &orig, const vec3 &dir,
     minDist = std::min(trianglesDist, minDist);
 }
 
+std::array<std::pair<int, int>, 3> BoundingBox::getCoordinates(const vec3 &orig,
+    const vec3 &dir, const float &nearDist, const float &farDist) const {
+    std::array<std::pair<int, int>, 3> coords;
+    vec3 hit = orig + dir * nearDist;
+    vec3 far = orig + dir * farDist;
+
+    float width = dx.second - dx.first;
+    float height = dy.second - dy.first;
+    float depth = dz.second - dz.first;
+    
+    coords[0] = std::pair<int, int>(0, size - 1);
+    
+    float dt = dot(vec3(dir.x, 0, 0), vec3(1.0f, 0.0f, 0.0f)); 
+    if (dt > 0) {
+        float left = hit.x - minPoint.x;
+        float right = far.x - minPoint.x;
+        int iBegin = left / width * float(size);
+        int iEnd = right / width * float(size);
+        coords[0].first = std::min(iBegin, size - 1);
+        coords[0].second = std::min(iEnd, size - 1);
+    } else {
+        float left = far.x - minPoint.x;
+        float right = hit.x - minPoint.x;
+        int iBegin = left / width * float(size);
+        int iEnd = right / width * float(size);
+        coords[0].first = std::min(std::min(iBegin, iEnd), size - 1);
+        coords[0].second = std::min(std::min(iBegin, iEnd), size - 1);
+    }
+    return coords;
+}
+
 void SceneObjects::modelsIntersect(const vec3 &orig, const vec3 &dir,
         vec3 &hit, vec3 &N, Material &material, float &minDist) const {
     float modelsDist = std::numeric_limits<float>::max();
+    float eps = std::numeric_limits<float>::epsilon();
     for (auto &model : models) {
-        float boxDist = 0.0f;
-        if (model->boxIntersect(orig, dir, boxDist)) {
+        float nearDist(0), farDist(0);
+        if (model->boxIntersect(orig, dir, nearDist, farDist)) {
             int size = model->box.size;
             for (int i = 0; i < size; i++) {
-                for (int j = 0; j < size ; j++) {
+                for (int j = 0; j < size; j++) {
                     for (int k = 0; k < size; k++) {
-                        if (model->box.grid[i][j][k].rayIntersect(orig, dir, boxDist)) {
+                        if (model->box.tgrid[i][j][k].size() > 0 && model->box.grid[i][j][k].rayIntersect(orig, dir, nearDist)) {
                             float curDist = 0.0f;
                             for (const Triangle *triangle : model->box.tgrid[i][j][k]) {
                             //for (const Triangle *triangle : model->triangles) {    
@@ -376,4 +416,30 @@ void SceneObjects::islandsIntersect(const vec3 &orig, const vec3 &dir, vec3 &hit
         }
     }
     minDist = std::min(islandsDist, minDist);
+}
+
+Sky::Sky(const std::string &filename) {
+    int n = -1;
+    unsigned char *pixmap = stbi_load(filename.c_str(), &width, &height, &n, 0);
+    if (!pixmap || n != 3) {
+        std::cout << "Error: can not load the environment map" << std::endl;
+        return;
+    }
+    texture.resize(width * height);
+    float colorAlpha = 1 / 255.0f;
+    for (int j = height - 1; j >= 0; j--) {
+        for (int i = 0; i < width; i++) {
+            unsigned pos = i + j * width;
+            vec3 colorRGB(pixmap[pos * 3], pixmap[pos * 3 + 1], pixmap[pos * 3 + 2]);
+            texture[pos] = colorRGB * colorAlpha;
+        }
+    }
+    stbi_image_free(pixmap);
+}
+
+vec3 Sky::getColorAt(const vec3 &dir) {
+    int a = std::max(0, std::min(width -1, int((atan2(dir.z, dir.x) / (2*M_PI) + .5) * width)));
+    int b = std::max(0, std::min(height-1, int(acos(dir.y)/M_PI * height)));
+    int place = a + (unsigned(b - 100) % height) * width;
+    return texture[place % texture.size()];
 }

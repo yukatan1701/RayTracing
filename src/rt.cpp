@@ -1,9 +1,6 @@
 #include <iostream>
 #include "ParseException.h"
 #include "Scene.h"
-#include "Scene1.h"
-#include "Scene2.h"
-#include "Scene3.h"
 
 using namespace glm;
 
@@ -45,15 +42,8 @@ int main(int argc, char **argv) {
         e.printMessage();
         return -1;
     }
-    Scene *scene;
-    if (settings.scene == 1) {
-        scene = new Scene1();
-    } else if (settings.scene == 2) {
-        scene = new Scene2();
-    } else if (settings.scene == 3) {
-        scene = new Scene3();
-    }
-    int code = scene->run(settings);
-    delete scene;
-    return code;
+    if (settings.scene != 1)
+        return 0;
+    Scene scene;
+    return scene.run(settings);
 }
